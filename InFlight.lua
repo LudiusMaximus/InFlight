@@ -786,8 +786,6 @@ function InFlight:StartMiscFlight(src, dst)  -- called from InFlight_Load for sp
 end
 
 do  -- timer bar
-  local bdrop = { edgeSize = 16, insets = {}, }
-  local bdi = bdrop.insets
   -----------------------------
   function InFlight:CreateBar()
   -----------------------------
@@ -1017,13 +1015,25 @@ do  -- timer bar
     sb:SetHeight(profile.height)
 
     local texture = smed:Fetch("statusbar", profile.texture)
+    local borderTexture = smed:Fetch("border", profile.border)
     local inset = (profile.border=="Textured" and 2) or 4
-    bdrop.bgFile = texture
-    bdrop.edgeFile = smed:Fetch("border", profile.border)
-    bdi.left, bdi.right, bdi.top, bdi.bottom = inset, inset, inset, inset
-    bord:SetBackdrop(bdrop)
-    bord:SetBackdropColor(profile.backcolor.r, profile.backcolor.g, profile.backcolor.b, profile.backcolor.a)
-    bord:SetBackdropBorderColor(profile.bordercolor.r, profile.bordercolor.g, profile.bordercolor.b, profile.bordercolor.a)
+    
+    local backcolor = profile.backcolor or {r=0.1, g=0.1, b=0.1, a=0.6}
+    local bordercolor = profile.bordercolor or {r=0.6, g=0.6, b=0.6, a=0.8}
+    
+    
+    -- Create fresh backdrop table to ensure proper SetBackdrop behavior
+    local newBackdrop = {
+      bgFile = texture,
+      edgeFile = borderTexture,
+      edgeSize = 16,
+      insets = { left = inset, right = inset, top = inset, bottom = inset },
+    }
+    
+    bord:SetBackdrop(newBackdrop)
+    bord:SetBackdropColor(backcolor.r or 0.1, backcolor.g or 0.1, backcolor.b or 0.1, backcolor.a or 0.6)
+    bord:SetBackdropBorderColor(bordercolor.r or 0.6, bordercolor.g or 0.6, bordercolor.b or 0.6, bordercolor.a or 0.8)
+    
     sb:SetStatusBarTexture(texture)
     if sb:GetStatusBarTexture() then
       sb:GetStatusBarTexture():SetHorizTile(false)
@@ -1033,7 +1043,8 @@ do  -- timer bar
     spark:SetHeight(profile.height * 2.4)
     if endTime then  -- in case we're in flight
       ratio = profile.width / endTime
-      sb:SetStatusBarColor(profile.barcolor.r, profile.barcolor.g, profile.barcolor.b, profile.barcolor.a)
+      local barcolor = profile.barcolor or {r=0.5, g=0.5, b=0.8, a=1.0}
+      sb:SetStatusBarColor(barcolor.r or 0.5, barcolor.g or 0.5, barcolor.b or 0.8, barcolor.a or 1.0)
       if profile.spark then
         spark:Show()
       else
@@ -1043,15 +1054,16 @@ do  -- timer bar
       SetToUnknown()
     end
 
+    local fontcolor = profile.fontcolor or {r=1.0, g=1.0, b=1.0, a=1.0}
     locText:SetFont(smed:Fetch("font", profile.font), profile.fontsize, profile.outline and "OUTLINE" or nil)
-    locText:SetShadowColor(0, 0, 0, profile.fontcolor.a)
+    locText:SetShadowColor(0, 0, 0, fontcolor.a or 1.0)
     locText:SetShadowOffset(1, -1)
-    locText:SetTextColor(profile.fontcolor.r, profile.fontcolor.g, profile.fontcolor.b, profile.fontcolor.a)
+    locText:SetTextColor(fontcolor.r or 1.0, fontcolor.g or 1.0, fontcolor.b or 1.0, fontcolor.a or 1.0)
 
     timeText:SetFont(smed:Fetch("font", profile.font), profile.fontsize, profile.outlinetime and "OUTLINE" or nil)
-    timeText:SetShadowColor(0, 0, 0, profile.fontcolor.a)
+    timeText:SetShadowColor(0, 0, 0, fontcolor.a or 1.0)
     timeText:SetShadowOffset(1, -1)
-    timeText:SetTextColor(profile.fontcolor.r, profile.fontcolor.g, profile.fontcolor.b, profile.fontcolor.a)
+    timeText:SetTextColor(fontcolor.r or 1.0, fontcolor.g or 1.0, fontcolor.b or 1.0, fontcolor.a or 1.0)
 
     if profile.inline then
       timeText:SetJustifyH("RIGHT")
@@ -1082,308 +1094,292 @@ do  -- timer bar
 end
 
 
--- options table
-smed:Register("border", "Textured", "\\Interface\\None")  -- dummy border
-local InFlightDD, offsetvalue, offsetcount, lastb
-local info = { }
+-- Register dummy border for styling (allows "Textured" border option without an actual texture file)
+smed:Register("border", "Textured", "\\Interface\\None")
+
 -------------------------------
 function InFlight.ShowOptions()
 -------------------------------
-  if not InFlightDD then
-    InFlightDD = CreateFrame("Frame", "InFlightDD", InFlight)
-    InFlightDD.displayMode = "MENU"
+  -- Helper: Open dialog to edit the "to" text separator
+  local function ShowToTextDialog()
+    StaticPopupDialogs["InFlightToText"] = StaticPopupDialogs["InFlightToText"] or {
+      text = L["Enter your 'to' text."],
+      button1 = ACCEPT, button2 = CANCEL,
+      hasEditBox = 1, maxLetters = 12,
+      OnAccept = function(self)
+        local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
+        profile.totext = strtrim(editBox:GetText())
+        InFlight:UpdateLook()
+      end,
+      OnShow = function(self)
+        local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
+        editBox:SetText(profile.totext)
+        editBox:SetFocus()
+      end,
+      OnHide = function(self)
+        local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
+        editBox:SetText("")
+      end,
+      EditBoxOnEnterPressed = function(self)
+        local parent = self:GetParent()
+        local editBox = parent.editBox or _G[parent:GetName() .. "EditBox"]
+        profile.totext = strtrim(editBox:GetText())
+        parent:Hide()
+        InFlight:UpdateLook()
+      end,
+      EditBoxOnEscapePressed = function(self)
+        self:GetParent():Hide()
+      end,
+      timeout = 0, exclusive = 1, whileDead = 1, hideOnEscape = 1,
+    }
+    StaticPopup_Show("InFlightToText")
+  end
 
-    hooksecurefunc("ToggleDropDownMenu", function(...) lastb = select(8, ...) end)
-    local function Exec(b, k, value)
-      if k == "totext" then
-        StaticPopupDialogs["InFlightToText"] = StaticPopupDialogs["InFlightToText"] or {
-          text = L["Enter your 'to' text."],
-          button1 = ACCEPT, button2 = CANCEL,
-          hasEditBox = 1, maxLetters = 12,
-          OnAccept = function(self)
-            -- self.editBox is no longer accessible since 11.2.
-            local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
-            profile.totext = strtrim(editBox:GetText())
-            InFlight:UpdateLook()
-          end,
+  -- Helper: Reset all options to defaults
+  local function ResetOptions()
+    InFlight.db:ResetProfile()
+    if InFlight.db:GetCurrentProfile() ~= "Default" then
+      profile.perchar = true
+    end
+    InFlight:UpdateLook()
+  end
 
-          OnShow = function(self)
-            -- self.editBox is no longer accessible since 11.2.
-            local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
-            editBox:SetText(profile.totext)
-            editBox:SetFocus()
-          end,
+  -- Helper: Clear flight time database and reload UI
+  local function ResetFlightTimes()
+    InFlightDB.dbinit = nil
+    InFlightDB.global = {}
+    ReloadUI()
+  end
 
-          OnHide = function(self)
-            -- self.editBox is no longer accessible since 11.2.
-            local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
-            editBox:SetText("")
-          end,
+  -- Helper: Export flight time data to developers
+  local function ExportFlightTimes()
+    if PTR_IssueReporter == nil then
+      InFlight:ExportDB()
+    else
+      print("Only exporting from the live game client. PTR has been unreliable before.")
+    end
+  end
 
-          EditBoxOnEnterPressed = function(self)
-            local parent = self:GetParent()
-            
-            -- self.editBox is no longer accessible since 11.2.
-            local editBox = parent.editBox or _G[parent:GetName() .. "EditBox"]
-            profile.totext = strtrim(editBox:GetText())
-            
-            parent:Hide()
-            InFlight:UpdateLook()
-          end,
+  -- Helper: Toggle per-character profile setting
+  local function TogglePerCharProfile()
+    local charKey = UnitName("player") .. " - " .. GetRealmName()
+    if profile.perchar then
+      profile.perchar = false
+      InFlight.db:SetProfile(charKey)
+      InFlight.db:CopyProfile("Default")
+      profile = InFlight.db.profile
+      profile.perchar = true
+    else
+      InFlight.db:SetProfile("Default")
+      profile = InFlight.db.profile
+      InFlight.db:DeleteProfile(charKey)
+    end
+    InFlight:UpdateLook()
+  end
 
-          EditBoxOnEscapePressed = function(self)
-            self:GetParent():Hide()
-          end,
+  -- Helper: Update numeric/string profile values
+  local function SetSelect(optionKey, value)
+    profile[optionKey] = tonumber(value) or value
+    InFlight:UpdateLook()
+  end
 
-          timeout = 0, exclusive = 1, whileDead = 1, hideOnEscape = 1,
-        }
-        StaticPopup_Show("InFlightToText")
-      elseif (k == "less" or k == "more") and lastb then
-        local off = (k == "less" and -8) or 8
-        if offsetvalue == value then
-          offsetcount = offsetcount + off
-        else
-          offsetvalue, offsetcount = value, off
+  -- Helper: Update color values with validation and clamping
+  local function SetColor(colorKey, red, green, blue, alpha)
+    local colorTable = profile[colorKey]
+    if not colorTable then return end
+    
+    -- Clamp all RGBA values to valid 0-1 range, using current values as fallback
+    colorTable.r = math.max(0, math.min(1, tonumber(red) or colorTable.r))
+    colorTable.g = math.max(0, math.min(1, tonumber(green) or colorTable.g))
+    colorTable.b = math.max(0, math.min(1, tonumber(blue) or colorTable.b))
+    colorTable.a = math.max(0, math.min(1, tonumber(alpha) or colorTable.a))
+    InFlight:UpdateLook()
+  end
+
+  -- Helper: Open color picker for a given color type
+  local function OpenColorPicker(colorKey)
+    local colorTable = profile[colorKey]
+    if not colorTable then return end
+    
+    local colorInfo = {
+      r = colorTable.r, g = colorTable.g, b = colorTable.b, opacity = colorTable.a,
+      hasOpacity = true,
+      swatchFunc = function()
+        local r, g, b = ColorPickerFrame:GetColorRGB()
+        local a = ColorPickerFrame:GetColorAlpha()
+        SetColor(colorKey, r, g, b, a)
+      end,
+      opacityFunc = function()
+        local r, g, b = ColorPickerFrame:GetColorRGB()
+        local a = ColorPickerFrame:GetColorAlpha()
+        SetColor(colorKey, r, g, b, a)
+      end,
+      cancelFunc = function(previousValues)
+        if previousValues then
+          SetColor(colorKey, previousValues.r, previousValues.g, previousValues.b, previousValues.a)
+        end
+      end,
+    }
+    ColorPickerFrame:SetupColorPickerAndShow(colorInfo)
+  end
+
+  -- Helper: Create slider submenu with pagination for large ranges
+  local function AddFakeSliderSubmenu(parentMenu, sliderLabel, profileKey, minValue, maxValue, stepSize, itemTable)
+    local sliderButton = parentMenu:CreateButton(sliderLabel)
+    sliderButton:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+
+    if itemTable then
+      -- For named lists (textures, borders, fonts), display all items directly
+      for i = minValue, maxValue, stepSize do
+        local itemName = itemTable[i]
+        sliderButton:CreateRadio(itemName, 
+          function() return profile[profileKey] == itemName end, 
+          function() SetSelect(profileKey, itemName); return MenuResponse.Refresh end)
+      end
+    else
+      -- For numeric ranges, paginate into ~20-item submenus to prevent screen overflow
+      local itemsPerPage = 20
+      local rangeStart = minValue
+      local numberFormat = (stepSize >= 1 and "%d") or (stepSize >= 0.1 and "%.1f") or "%.2f"
+      
+      while rangeStart <= maxValue do
+        -- Calculate range end, aiming for ~20 items but respecting the maximum
+        local rangeEnd = min(maxValue, rangeStart + (itemsPerPage - 1) * stepSize)
+        
+        -- Align range end to avoid ugly boundaries
+        local alignmentOffset = rangeEnd % (itemsPerPage * stepSize)
+        if rangeEnd ~= maxValue and alignmentOffset > 0 then
+          rangeEnd = rangeEnd - alignmentOffset
         end
 
-        local tb = _G[gsub(lastb:GetName(), "ExpandArrow", "")]
-        CloseDropDownMenus(b:GetParent():GetID())
-        ToggleDropDownMenu(b:GetParent():GetID(), tb.value, nil, nil, nil, nil, tb.menuList, tb)
-      elseif k == "resetoptions" then
-        InFlight.db:ResetProfile()
-        if InFlight.db:GetCurrentProfile() ~= "Default" then
-          profile.perchar = true
+        local pageLabel = format("%s: %d-%d", sliderLabel, rangeStart, rangeEnd)
+        local rangeMenu = sliderButton:CreateButton(pageLabel)
+        rangeMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+        
+        -- Add all values in this range with the original step size
+        for currentValue = rangeStart, rangeEnd, stepSize do
+          local value = currentValue  -- Capture in closure to avoid variable capture issues
+          rangeMenu:CreateRadio(format(numberFormat, value), 
+            function() return floor(100 * (profile[profileKey] or 0)) == floor(100 * value) end, 
+            function() SetSelect(profileKey, value); return MenuResponse.Refresh end)
         end
-      elseif k == "resettimes" then
-        InFlightDB.dbinit = nil
-        InFlightDB.global = {}
-        ReloadUI()
-      elseif k == "exporttimes" then
-        if PTR_IssueReporter == nil then
-          InFlight:ExportDB()
-        else
-          print("Only exporting from the live game client. PTR has been unreliable before.")
+        
+        -- Advance to next range or break if we've reached the end
+        if rangeEnd >= maxValue then
+          break
         end
-      end
-    end
-
-
-    local function Toggle(_, k)
-      if not k then
-        return
-      end
-
-      profile[k] = not profile[k]
-
-      if k == "perchar" then
-        local charKey = UnitName("player").." - "..GetRealmName()
-        if profile[k] then
-          profile[k] = false
-          InFlight.db:SetProfile(charKey)
-          InFlight.db:CopyProfile("Default")
-          profile = InFlight.db.profile
-          profile[k] = true
-        else
-          InFlight.db:SetProfile("Default")
-          profile = InFlight.db.profile
-          InFlight.db:DeleteProfile(charKey)
-        end
-      end
-
-      InFlight:UpdateLook()
-    end
-
-    local function SetSelect(b, a1)
-      profile[a1] = tonumber(b.value) or b.value
-      local level, num = strmatch(b:GetName(), "DropDownList(%d+)Button(%d+)")
-      level, num = tonumber(level) or 0, tonumber(num) or 0
-      for i = 1, UIDROPDOWNMENU_MAXBUTTONS, 1 do
-        local b = _G["DropDownList"..level.."Button"..i.."Check"]
-        if b then
-          b[i == num and "Show" or "Hide"](b)
-        end
-      end
-
-      InFlight:UpdateLook()
-    end
-
-    local function SetColor(a1)
-      local dbc = profile[UIDROPDOWNMENU_MENU_VALUE]
-      if not dbc then
-        return
-      end
-
-      if a1 then
-        dbc.r, dbc.g, dbc.b, dbc.a = ColorPickerFrame:GetPreviousValues()
-      else
-        dbc.r, dbc.g, dbc.b = ColorPickerFrame:GetColorRGB()
-        dbc.a = ColorPickerFrame:GetColorAlpha()
-      end
-
-      InFlight:UpdateLook()
-    end
-
-    local function AddButton(lvl, text, keepshown)
-      info.text = text
-      info.keepShownOnClick = keepshown
-      UIDropDownMenu_AddButton(info, lvl)
-      wipe(info)
-    end
-
-    local function AddToggle(lvl, text, value)
-      info.arg1 = value
-      info.func = Toggle
-      info.checked = profile[value]
-      info.isNotRadio = true
-      AddButton(lvl, text, true)
-    end
-
-    local function AddExecute(lvl, text, arg1, arg2)
-      info.arg1 = arg1
-      info.arg2 = arg2
-      info.func = Exec
-      info.notCheckable = 1
-      AddButton(lvl, text, true)
-    end
-
-    local function AddColor(lvl, text, value)
-      local dbc = profile[value]
-      if not dbc then
-        return
-      end
-
-      info.padding = 5
-      info.hasColorSwatch = true
-      info.hasOpacity = 1
-      info.r, info.g, info.b, info.opacity = dbc.r, dbc.g, dbc.b, dbc.a
-      info.swatchFunc, info.opacityFunc, info.cancelFunc = SetColor, SetColor, SetColor
-      info.value = value
-      info.notCheckable = 1
-      info.func = UIDropDownMenuButton_OpenColorPicker
-      AddButton(lvl, text)
-    end
-
-    local function AddList(lvl, text, value)
-      info.value = value
-      info.hasArrow = true
-      info.notCheckable = 1
-      AddButton(lvl, text, true)
-    end
-
-    local function AddSelect(lvl, text, arg1, value)
-      info.arg1 = arg1
-      info.func = SetSelect
-      info.value = value
-      if tonumber(value) and tonumber(profile[arg1] or "blah") then
-        if floor(100 * tonumber(value)) == floor(100 * tonumber(profile[arg1])) then
-          info.checked = true
-        end
-      else
-        info.checked = (profile[arg1] == value)
-      end
-
-      AddButton(lvl, text, true)
-    end
-
-    local function AddFakeSlider(lvl, value, minv, maxv, step, tbl)
-      local cvalue = 0
-      local dbv = profile[value]
-      if type(dbv) == "string" and tbl then
-        for i, v in ipairs(tbl) do
-          if dbv == v then
-            cvalue = i
-            break
-          end
-        end
-      else
-        cvalue = dbv or ((maxv - minv) / 2)
-      end
-
-      local adj = (offsetvalue == value and offsetcount) or 0
-      local starti = max(minv, cvalue - (7 - adj) * step)
-      local endi = min(maxv, cvalue + (8 + adj) * step)
-      if starti == minv then
-        endi = min(maxv, starti + 16 * step)
-      elseif endi == maxv then
-        starti = max(minv, endi - 16 * step)
-      end
-
-      if starti > minv then
-        AddExecute(lvl, "--", "less", value)
-      end
-
-      if tbl then
-        for i = starti, endi, step do
-          AddSelect(lvl, tbl[i], value, tbl[i])
-        end
-      else
-        local fstring = (step >= 1 and "%d") or (step >= 0.1 and "%.1f") or "%.2f"
-        for i = starti, endi, step do
-          AddSelect(lvl, format(fstring, i), value, i)
-        end
-      end
-
-      if endi < maxv then
-        AddExecute(lvl, "++", "more", value)
-      end
-    end
-
-    InFlightDD.initialize = function(self, lvl)
-      if lvl == 1 then
-        info.isTitle = true
-        info.notCheckable = 1
-        AddButton(lvl, "|cff0040ffIn|cff00aaffFlight|r")
-        AddList(lvl, L["BarOptions"], "frame")
-        AddList(lvl, L["TextOptions"], "text")
-        AddList(lvl, _G.OTHER, "other")
-      elseif lvl == 2 then
-        local sub = UIDROPDOWNMENU_MENU_VALUE
-        if sub == "frame" then
-          AddToggle(lvl, L["CountUp"], "countup")
-          AddToggle(lvl, L["FillUp"], "fill")
-          AddToggle(lvl, L["ShowSpark"], "spark")
-          AddList(lvl, L["Height"], "height")
-          AddList(lvl, L["Width"], "width")
-          AddList(lvl, L["Texture"], "texture")
-          AddList(lvl, L["Border"], "border")
-          AddColor(lvl, L["BackgroundColor"], "backcolor")
-          AddColor(lvl, L["BarColor"], "barcolor")
-          AddColor(lvl, L["UnknownColor"], "unknowncolor")
-          AddColor(lvl, L["BorderColor"], "bordercolor")
-        elseif sub == "text" then
-          AddToggle(lvl, L["CompactMode"], "inline")
-                    AddToggle(lvl, L["TwoLines"], "twolines")
-          AddExecute(lvl, L["ToText"], "totext")
-          AddList(lvl, L["Font"], "font")
-          AddList(lvl, _G.FONT_SIZE, "fontsize")
-          AddColor(lvl, L["FontColor"], "fontcolor")
-          AddToggle(lvl, L["OutlineInfo"], "outline")
-          AddToggle(lvl, L["OutlineTime"], "outlinetime")
-        elseif sub == "other" then
-          AddToggle(lvl, L["ShowChat"], "chatlog")
-          AddToggle(lvl, L["ConfirmFlight"], "confirmflight")
-          AddToggle(lvl, L["PerCharOptions"], "perchar")
-          AddExecute(lvl, L["ResetOptions"], "resetoptions")
-          AddExecute(lvl, L["ResetFlightTimes"], "resettimes")
-          AddExecute(lvl, L["ExportFlightTimes"], "exporttimes")
-        end
-      elseif lvl == 3 then
-        local sub = UIDROPDOWNMENU_MENU_VALUE
-        if sub == "texture" or sub == "border" or sub == "font" then
-          local t = smed:List(sub == "texture" and "statusbar" or sub)
-          AddFakeSlider(lvl, sub, 1, #t, 1, t)
-        elseif sub == "width" then
-          AddFakeSlider(lvl, sub, 40, 500, 5)
-        elseif sub == "height" then
-          AddFakeSlider(lvl, sub, 4, 100, 1)
-        elseif sub == "fontsize" then
-          AddFakeSlider(lvl, sub, 4, 30, 1)
-        end
+        rangeStart = rangeEnd + stepSize
       end
     end
   end
 
-  ToggleDropDownMenu(1, nil, InFlightDD, "cursor")
+  MenuUtil.CreateContextMenu(UIParent, function(_, mainMenu)
+    mainMenu:CreateTitle("|cff0040ffIn|cff00aaffFlight|r")
+    mainMenu:CreateDivider()
+
+    -- ===== BAR OPTIONS =====
+    local barMenu = mainMenu:CreateButton(L["BarOptions"])
+    barMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+    
+    barMenu:CreateCheckbox(L["CountUp"], function() return profile.countup end, function() profile.countup = not profile.countup; InFlight:UpdateLook() end)
+    barMenu:CreateCheckbox(L["FillUp"], function() return profile.fill end, function() profile.fill = not profile.fill; InFlight:UpdateLook() end)
+    barMenu:CreateCheckbox(L["ShowSpark"], function() return profile.spark end, function() profile.spark = not profile.spark; InFlight:UpdateLook() end)
+    
+    -- Bar dimensions
+    AddFakeSliderSubmenu(barMenu, L["Height"], "height", 4, 150, 1, nil)
+    AddFakeSliderSubmenu(barMenu, L["Width"], "width", 40, 1000, 5, nil)
+    
+    -- Bar appearance from LibSharedMedia
+    local statusbarList = smed:List("statusbar")
+    local borderList = smed:List("border")
+    -- Remove broken border textures by rebuilding the table
+    local filteredBorderList = {}
+    for _, borderName in ipairs(borderList) do
+      if borderName ~= "Blizzard Party" then
+        table.insert(filteredBorderList, borderName)
+      end
+    end
+    AddFakeSliderSubmenu(barMenu, L["Texture"], "texture", 1, #statusbarList, 1, statusbarList)
+    AddFakeSliderSubmenu(barMenu, L["Border"], "border", 1, #filteredBorderList, 1, filteredBorderList)
+    
+    barMenu:CreateDivider()
+    
+    -- Bar colors
+    barMenu:CreateColorSwatch(L["BackgroundColor"], function() OpenColorPicker("backcolor") end, 
+      {r = profile.backcolor.r, g = profile.backcolor.g, b = profile.backcolor.b})
+    barMenu:CreateColorSwatch(L["BarColor"], function() OpenColorPicker("barcolor") end, 
+      {r = profile.barcolor.r, g = profile.barcolor.g, b = profile.barcolor.b})
+    barMenu:CreateColorSwatch(L["UnknownColor"], function() OpenColorPicker("unknowncolor") end, 
+      {r = profile.unknowncolor.r, g = profile.unknowncolor.g, b = profile.unknowncolor.b})
+    barMenu:CreateColorSwatch(L["BorderColor"], function() OpenColorPicker("bordercolor") end, 
+      {r = profile.bordercolor.r, g = profile.bordercolor.g, b = profile.bordercolor.b})
+    
+    -- ===== TEXT OPTIONS =====
+    local textMenu = mainMenu:CreateButton(L["TextOptions"])
+    textMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+    
+    textMenu:CreateCheckbox(L["CompactMode"], 
+      function() return profile.inline end, 
+      function() profile.inline = not profile.inline; InFlight:UpdateLook() end)
+    
+    textMenu:CreateCheckbox(L["TwoLines"], 
+      function() return profile.twolines end, 
+      function() profile.twolines = not profile.twolines; InFlight:UpdateLook() end)
+    
+    textMenu:CreateButton(L["ToText"], function() ShowToTextDialog() end)
+    
+    -- Font selection from LibSharedMedia
+    local fontList = smed:List("font")
+    AddFakeSliderSubmenu(textMenu, L["Font"], "font", 1, #fontList, 1, fontList)
+    
+    -- Font size range (4-30 points)
+    AddFakeSliderSubmenu(textMenu, _G.FONT_SIZE, "fontsize", 4, 30, 1, nil)
+    
+    textMenu:CreateDivider()
+    textMenu:CreateColorSwatch(L["FontColor"], function()
+      OpenColorPicker("fontcolor")
+    end, {r = profile.fontcolor.r, g = profile.fontcolor.g, b = profile.fontcolor.b})
+
+    textMenu:CreateCheckbox(L["OutlineInfo"], 
+      function() return profile.outline end, 
+      function() profile.outline = not profile.outline; InFlight:UpdateLook() end)
+    
+    textMenu:CreateCheckbox(L["OutlineTime"], 
+      function() return profile.outlinetime end, 
+      function() profile.outlinetime = not profile.outlinetime; InFlight:UpdateLook() end)
+
+    mainMenu:CreateDivider()
+
+    -- ===== OTHER OPTIONS =====
+    local otherMenu = mainMenu:CreateButton(_G.OTHER)
+    otherMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+    
+    otherMenu:CreateCheckbox(L["ShowChat"], 
+      function() return profile.chatlog end, 
+      function() profile.chatlog = not profile.chatlog; InFlight:UpdateLook() end)
+    
+    otherMenu:CreateCheckbox(L["ConfirmFlight"], 
+      function() return profile.confirmflight end, 
+      function() profile.confirmflight = not profile.confirmflight; InFlight:UpdateLook() end)
+    
+    otherMenu:CreateCheckbox(L["PerCharOptions"], 
+      function() return profile.perchar end, 
+      function() TogglePerCharProfile() end)
+    
+    otherMenu:CreateDivider()
+    
+    otherMenu:CreateButton(L["ResetOptions"], function()
+      ResetOptions()
+    end)
+    
+    otherMenu:CreateButton(L["ResetFlightTimes"], function()
+      ResetFlightTimes()
+    end)
+    
+    otherMenu:CreateButton(L["ExportFlightTimes"], function()
+      ExportFlightTimes()
+    end)
+  end)
 end
 
 
