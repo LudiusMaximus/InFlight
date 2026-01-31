@@ -1228,17 +1228,46 @@ function InFlight.ShowOptions()
     local sliderButton = parentMenu:CreateButton(sliderLabel)
     sliderButton:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
 
+    local itemsPerPage = 20
+
     if itemTable then
-      -- For named lists (textures, borders, fonts), display all items directly
-      for i = minValue, maxValue, stepSize do
-        local itemName = itemTable[i]
-        sliderButton:CreateRadio(itemName, 
-          function() return profile[profileKey] == itemName end, 
-          function() SetSelect(profileKey, itemName); return MenuResponse.Refresh end)
+      -- For named lists (textures, borders, fonts), check if pagination is needed
+      local totalItems = maxValue - minValue + 1
+      
+      if totalItems <= itemsPerPage then
+        -- Display all items directly if 20 or fewer
+        for i = minValue, maxValue, stepSize do
+          local itemName = itemTable[i]
+          sliderButton:CreateRadio(itemName, 
+            function() return profile[profileKey] == itemName end, 
+            function() SetSelect(profileKey, itemName); return MenuResponse.Refresh end)
+        end
+      else
+        -- Paginate into submenus if more than 20 items
+        local rangeStart = minValue
+        
+        while rangeStart <= maxValue do
+          local rangeEnd = min(maxValue, rangeStart + itemsPerPage - 1)
+          
+          local pageLabel = format("%s: %d-%d", sliderLabel, rangeStart, rangeEnd)
+          local rangeMenu = sliderButton:CreateButton(pageLabel)
+          rangeMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+          
+          for i = rangeStart, rangeEnd, stepSize do
+            local itemName = itemTable[i]
+            rangeMenu:CreateRadio(itemName, 
+              function() return profile[profileKey] == itemName end, 
+              function() SetSelect(profileKey, itemName); return MenuResponse.Refresh end)
+          end
+          
+          if rangeEnd >= maxValue then
+            break
+          end
+          rangeStart = rangeEnd + stepSize
+        end
       end
     else
       -- For numeric ranges, paginate into ~20-item submenus to prevent screen overflow
-      local itemsPerPage = 20
       local rangeStart = minValue
       local numberFormat = (stepSize >= 1 and "%d") or (stepSize >= 0.1 and "%.1f") or "%.2f"
       
