@@ -1164,15 +1164,23 @@ function InFlight.ShowOptions()
   local function TogglePerCharProfile()
     local charKey = UnitName("player") .. " - " .. GetRealmName()
     if profile.perchar then
+      -- Disabling: switch back to Default and delete the char profile
+      InFlight.db:SetProfile("Default")
+      profile = InFlight.db.profile
       profile.perchar = false
+      local existingProfiles = InFlight.db:GetProfiles()
+      for _, name in ipairs(existingProfiles) do
+        if name == charKey then
+          InFlight.db:DeleteProfile(charKey)
+          break
+        end
+      end
+    else
+      -- Enabling: copy current Default settings into char profile, then switch to it
       InFlight.db:SetProfile(charKey)
       InFlight.db:CopyProfile("Default")
       profile = InFlight.db.profile
       profile.perchar = true
-    else
-      InFlight.db:SetProfile("Default")
-      profile = InFlight.db.profile
-      InFlight.db:DeleteProfile(charKey)
     end
     InFlight:UpdateLook()
   end
