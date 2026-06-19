@@ -235,6 +235,16 @@ local function GetEstimatedTime(slot)  -- estimates flight times based on hops
     taxiNodes[hop] = GetNodeID(TaxiGetNodeSlot(slot, hop, true))
   end
 
+  -- Intermediate hops of cross-map routes cannot always be resolved to a node ID,
+  -- because GetNodeID only searches the currently viewed taxi map. Without every
+  -- node ID the per-hop durations cannot be summed, so skip the estimate (caller
+  -- falls back to "-:--") instead of erroring on a nil node below.
+  for hop = 1, numRoutes + 1, 1 do
+    if not taxiNodes[hop] then
+      return
+    end
+  end
+
   local etimes = { 0 }
   local prevNode = {}
   local nextNode = {}
