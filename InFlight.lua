@@ -766,10 +766,120 @@ function InFlight:StartTimer(slot)  -- lift off
   self:RegisterEvent("PLAYER_ENTERING_WORLD")
   self:RegisterEvent("PLAYER_LEAVING_WORLD")
 
+  -- Remember the flight, so that a UI reload during it loses neither the bar nor
+  -- the measurement. Only reloads can be recovered, see InFlight:RecoverFlight.
+  self:RememberFlight()
+
   if slot then
     oldTakeTaxiNode(slot)
   end
 end
+
+
+-------------------------------
+function InFlight:RememberFlight()
+-------------------------------
+  if not self.db then
+    return
+  end
+
+  -- This must not go into db.global. That table is walked as pure flight time data,
+  -- once to drop times that duplicate the defaults and once to collect the export,
+  -- and both loops take every key in it for a faction. db.char is simply a scope
+  -- that is out of their way. Nothing here relies on it being per character: a
+  -- reload cannot change the character, and a logout is not recovered anyway.
+  self.db.char.inTransit = taxiSrc and {
+    src = taxiSrc,
+    srcName = taxiSrcName,
+    dst = taxiDst,
+    dstName = taxiDstName,
+    startTime = startTime,
+    airborne = ontaxi and true or nil,
+  } or nil
+end
+
+
+---------------------------------------------
+function InFlight:RecoverFlight(isReloadingUi)  -- pick a flight back up after a UI reload
+---------------------------------------------
+  local saved = self.db and self.db.char.inTransit
+  if not saved then
+    return
+  end
+  self.db.char.inTransit = nil
+
+  -- Only a reload keeps the character in the world, so only then has the flight kept
+  -- going and GetTime() kept running. After a logout the flight is paused while
+  -- GetTime() is not, and no API tells us how much of the flight is left.
+  if not isReloadingUi or not UnitOnTaxi("player") then
+    return
+  end
+
+  -- Before take off the clock still includes the delay between clicking the flight
+  -- master and lifting off, which would end up in the measured flight time.
+  if not saved.airborne then
+    return
+  end
+
+  -- A restarted client resets GetTime(), which makes the stored time meaningless.
+  local flown = GetTime() - saved.startTime
+  if flown < 0 then
+    return
+  end
+
+  taxiSrc, taxiSrcName = saved.src, saved.srcName
+  taxiDst, taxiDstName = saved.dst, saved.dstName
+
+  local dstNodes = GetDstNodes(taxiSrc, playerFaction)
+  local flightTime = dstNodes and dstNodes[taxiDst]
+  if flightTime and flightTime > 0 then
+    endTime = flightTime * self:KhazAlgarFlightMasterFactor(taxiDst) * self:RideLikeTheWindFactor()
+  else
+    endTime = nil
+  end
+  endText = FormatTime(endTime)
+
+  if not sb then
+    self:CreateBar()
+  end
+
+  if endTime then
+    sb:SetMinMaxValues(0, endTime)
+  else
+    SetToUnknown()
+  end
+
+  self:UpdateLook()
+  sb:Show()
+  self:Show()
+
+  -- Continue the flight rather than start one: there is no take off left to wait for.
+  porttaken, takeoff = nil, nil
+  ontaxi, inworld = true, true
+  elapsed, totalTime, startTime = 0, flown, saved.startTime
+  throt = min(0.2, (endTime or 50) / (profile.width or 1))
+
+  self:RegisterEvent("LFG_PROPOSAL_DONE")
+  self:RegisterEvent("LFG_PROPOSAL_SUCCEEDED")
+  self:RegisterEvent("PLAYER_CONTROL_GAINED")
+  self:RegisterEvent("PLAYER_ENTERING_WORLD")
+  self:RegisterEvent("PLAYER_LEAVING_WORLD")
+
+  -- Store it again, so that a second reload during the same flight also works.
+  self:RememberFlight()
+
+  PrintD("|cff208080Recovered flight after reload,|r", FormatTime(flown), "|cff208080flown|r")
+end
+
+
+-- InFlight's own PLAYER_ENTERING_WORLD handler only exists while a flight is running,
+-- so recovery needs a frame of its own. Only the first event after loading matters.
+local recoverFrame = CreateFrame("Frame")
+recoverFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+recoverFrame:SetScript("OnEvent", function(this, event, isInitialLogin, isReloadingUi)
+  this:UnregisterEvent("PLAYER_ENTERING_WORLD")
+  InFlight:RecoverFlight(isReloadingUi)
+end)
 
 -------------------------------------------
 function InFlight:StartMiscFlight(src, dst)  -- called from InFlight_Load for special flights
@@ -852,7 +962,10 @@ do  -- timer bar
         if UnitOnTaxi("player") then
           takeoff, ontaxi = nil, true
           elapsed, totalTime, startTime = throt - 0.01, 0, GetTime()
+          -- Take off resets the clock, so the stored flight has to follow.
+          InFlight:RememberFlight()
         elseif totalTime > 5 then
+          InFlight.db.char.inTransit = nil
           sb:Hide()
           this:Hide()
         end
@@ -934,6 +1047,7 @@ do  -- timer bar
         taxiDst = nil
         endTime = nil
         endText = FormatTime(endTime)
+        InFlight.db.char.inTransit = nil
         sb:Hide()
         this:Hide()
 
