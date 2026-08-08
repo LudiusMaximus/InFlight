@@ -446,43 +446,36 @@ function InFlight:LoadBulk()
   -- save data by the metatable
   local resetDB = false
 
-  -- post-cata
-  if select(4, GetBuildInfo()) >= 40000 then
-
-
-    -- Got to reset the user database after fix for factionless zones.
-    if InFlightDB.dbinit < 1102004 then
-      resetDB = true
-      InFlightDB.dbinit = 1102004
-    end
-
-
-    -- Check that this is the right version of the database to avoid corruption.
-    if InFlightDB.version ~= "post-cata" then
-      -- Used to be called "retail", so we only reset flight points if it was anything else.
-      if InFlightDB.version ~= "retail" then
-        resetDB = true
-      end
-      InFlightDB.version = "post-cata"
-    end
-
-  -- pre-cata
+  -- Every era gets its own database, because the eras do not share flight times.
+  -- Ratchet to Orgrimmar takes 210 seconds on Classic Era, where the trip goes via
+  -- The Crossroads, and 101 seconds on TBC Classic, where it is direct.
+  -- Everlook to Marshal's Stand takes 641 seconds on TBC Classic and 815 on retail.
+  --
+  -- Raise the dbinit of an era to wipe the databases of that era once. All four
+  -- had to be raised here, because times measured before the speed boost fix were
+  -- stored with the boost included, and because the pre-Cataclysm defaults have
+  -- been split up by era.
+  local buildInterface = select(4, GetBuildInfo())
+  local dbVersion, dbinitVersion
+  if buildInterface >= 40000 then
+    dbVersion, dbinitVersion = "post-cata", 1200010
+  elseif buildInterface >= 30000 then
+    dbVersion, dbinitVersion = "wrath", 1200010
+  elseif buildInterface >= 20000 then
+    dbVersion, dbinitVersion = "tbc", 1200010
   else
+    dbVersion, dbinitVersion = "classic-era", 1200010
+  end
 
-    if InFlightDB.dbinit ~= 1150 then
-      resetDB = true
-      InFlightDB.dbinit = 1150
-    end
+  if InFlightDB.dbinit ~= dbinitVersion then
+    resetDB = true
+    InFlightDB.dbinit = dbinitVersion
+  end
 
-    -- Check that this is the right version of the database to avoid corruption
-    if InFlightDB.version ~= "pre-cata" then
-      -- Used to be called "classic" or "classic-era", so we only reset flight points if it was anything else.
-      if InFlightDB.version ~= "classic" and InFlightDB.version ~= "classic-era" then
-        resetDB = true
-      end
-      InFlightDB.version = "pre-cata"
-    end
-
+  -- Check that this is the right version of the database to avoid corruption.
+  if InFlightDB.version ~= dbVersion then
+    resetDB = true
+    InFlightDB.version = dbVersion
   end
 
   if resetDB and not debug then
@@ -894,10 +887,13 @@ do  -- timer bar
 
 
 
+          -- Stored times are always without speed boosts, while measured times include them.
+          local speedFactor = InFlight:KhazAlgarFlightMasterFactor(taxiDst) * InFlight:RideLikeTheWindFactor()
+
           InFlight.db.global[faction][taxiSrc] = InFlight.db.global[faction][taxiSrc] or { name = taxiSrcName }
           local oldTime = InFlight.db.global[faction][taxiSrc][taxiDst]
           if oldTime then
-            oldTime = oldTime * InFlight:KhazAlgarFlightMasterFactor(taxiDst) * InFlight:RideLikeTheWindFactor()
+            oldTime = oldTime * speedFactor
           end
           local newTime = floor(totalTime + 0.5)
 
@@ -914,14 +910,17 @@ do  -- timer bar
             msg = nil
           end
 
-          if not defaultsGlobal[faction][taxiSrc] or not defaultsGlobal[faction][taxiSrc][taxiDst] or abs(newTime - defaultsGlobal[faction][taxiSrc][taxiDst]) > 2 then
-            -- print("Updating ", newTime, "as new time for", taxiSrcName)
+          -- Compare and export without the speed boost, because that is how defaults are stored.
+          local newBaseTime = floor(newTime / speedFactor + 0.5)
+
+          if not defaultsGlobal[faction][taxiSrc] or not defaultsGlobal[faction][taxiSrc][taxiDst] or abs(newBaseTime - defaultsGlobal[faction][taxiSrc][taxiDst]) > 2 then
+            -- print("Updating ", newBaseTime, "as new time for", taxiSrcName)
             newPlayerSaveData[faction] = newPlayerSaveData[faction] or {}
             newPlayerSaveData[faction][taxiSrc] = newPlayerSaveData[faction][taxiSrc] or {}
-            newPlayerSaveData[faction][taxiSrc][taxiDst] = newTime
+            newPlayerSaveData[faction][taxiSrc][taxiDst] = newBaseTime
           end
 
-          InFlight.db.global[faction][taxiSrc][taxiDst] = floor(newTime / (InFlight:KhazAlgarFlightMasterFactor(taxiDst) * InFlight:RideLikeTheWindFactor()) + 0.5)
+          InFlight.db.global[faction][taxiSrc][taxiDst] = newBaseTime
 
 
           if msg and profile.chatlog then

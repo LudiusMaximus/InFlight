@@ -691,11 +691,23 @@ end
 
 -- local exportText = ""
 
--- -- pre-cata
--- if select(4, GetBuildInfo()) < 40000 then
+-- -- pre-cata: every era has its own table, because the eras do not share
+-- -- flight times. Import into the table of the era the export came from.
+-- local buildInterface = select(4, GetBuildInfo())
+-- if buildInterface < 20000 then
 
   -- ImportUserUpload(addon.global_classic, myImport, false)
   -- exportText = GetExportText("local global_classic", addon.global_classic, "")
+
+-- elseif buildInterface < 30000 then
+
+  -- ImportUserUpload(addon.global_tbc, myImport, false)
+  -- exportText = GetExportText("local global_tbc", addon.global_tbc, "")
+
+-- elseif buildInterface < 40000 then
+
+  -- ImportUserUpload(addon.global_wrath, myImport, false)
+  -- exportText = GetExportText("local global_wrath", addon.global_wrath, "")
 
 -- -- retail
 -- else
