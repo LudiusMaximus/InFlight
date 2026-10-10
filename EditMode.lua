@@ -56,9 +56,9 @@ function InFlight:IsLayoutSpecific()
 end
 
 
-----------------------------------
+---------------------------------
 function InFlight:GetLayoutName()
-----------------------------------
+---------------------------------
   -- What the active layout is called, for naming it in the settings menu.
   return LLS and LLS:GetActiveLayoutName() or nil
 end
@@ -74,18 +74,18 @@ function InFlight:CanBeLayoutSpecific()
 end
 
 
--------------------------------------
+------------------------------------
 function InFlight:IsOnPresetLayout()
--------------------------------------
+------------------------------------
   -- One of Blizzard's preset layouts, which cannot be changed outside the layout
   -- editor, and inside it only by saving it as a new layout.
   return LLS ~= nil and LLS:IsSupported() and LLS:IsPresetActive()
 end
 
 
-------------------------------------------
+-----------------------------------------
 function InFlight:ResetLayoutToDefaults()
-------------------------------------------
+-----------------------------------------
   -- Puts this layout's own settings back to the defaults in Defaults.lua. The
   -- user's own settings are not touched: this layout is what the settings menu is
   -- editing while it is layout specific, so this layout is what resets.
@@ -107,13 +107,14 @@ function InFlight:ResetLayoutToDefaults()
 end
 
 
--------------------------------------------------
-function InFlight:CopyLayoutFromProfile(profileName)
--------------------------------------------------
-  -- Puts a set of the user's own settings onto this layout. Same shape as
-  -- ResetLayoutToDefaults: write every key this layout may hold, then let the
-  -- library fold the result in as a change to be saved. The profile itself is
-  -- only read.
+--------------------------------------------------
+function InFlight:CopyLookFromProfile(profileName)
+--------------------------------------------------
+  -- Puts a set of the user's own settings onto the bar, wherever its settings are
+  -- going right now: the layout in the layout editor, and on the settings page
+  -- the layout or the user's own settings. Every key a layout may hold is
+  -- written, then the library folds the result in. The profile itself is only
+  -- read.
   if not layoutKeys then
     return
   end
@@ -129,7 +130,7 @@ function InFlight:CopyLayoutFromProfile(profileName)
       value = defaults[key]
     end
     if value ~= nil then
-      self:SetLookOverride(key, type(value) == "table" and CopyTable(value) or value)
+      self:SetLook(key, value)
     end
   end
 
@@ -228,7 +229,7 @@ function InFlight:SetupEditMode()
     { type = "button", text = L["ResetToDefaults"], tooltip = L["ResetToDefaultsTooltip"],
       sameRow = true,
       OnClick = function()
-        InFlight:ResetLayoutToDefaults()
+        InFlight:ResetToDefaults()
       end },
 
     { type = "separator" },
@@ -250,7 +251,16 @@ function InFlight:SetupEditMode()
           }
         end
 
-        local profiles = InFlight:GetCopyableProfiles()
+        -- On the settings page with no layout owning the bar, the profile in use
+        -- is the one being edited, and copying it onto itself would do nothing.
+        local editing = not InFlight:IsLayoutSpecific() and InFlight.db:GetCurrentProfile()
+        local profiles = {}
+        for _, profile in ipairs(InFlight:GetCopyableProfiles()) do
+          if profile.name ~= editing then
+            profiles[#profiles + 1] = profile
+          end
+        end
+
         if #sources > 0 and #profiles > 0 then
           sources[#sources + 1] = { separator = true }
         end
@@ -259,7 +269,7 @@ function InFlight:SetupEditMode()
           local name = profile.name
           sources[#sources + 1] = {
             text = profile.accountWide and L["AccountWideSettings"] or name,
-            OnClick = function() InFlight:CopyLayoutFromProfile(name) end,
+            OnClick = function() InFlight:CopyLookFromProfile(name) end,
           }
         end
 
@@ -309,6 +319,21 @@ function InFlight:SetupEditMode()
       InFlight:SetLookOverride(key, value)
     end,
 
+    -- A change on the settings page, which goes where one from the settings menu
+    -- goes: to the layout while it owns the bar, to the user's own settings
+    -- otherwise.
+    EditSetting = function(key, value)
+      InFlight:SetLook(key, value)
+    end,
+
+    EditPosition = function(point, relativePoint, x, y)
+      InFlight:SetLook("p", point)
+      InFlight:SetLook("rp", relativePoint)
+      InFlight:SetLook("x", x)
+      InFlight:SetLook("y", y)
+      InFlight:ApplyBarPosition()
+    end,
+
     GetPosition = function()
       return InFlight:GetLook("p"), InFlight:GetLook("rp"),
              InFlight:GetLook("x"), InFlight:GetLook("y")
@@ -334,11 +359,23 @@ function InFlight:SetupEditMode()
     end,
 
     OnPreview = function(shown)
-      InFlight:SetEditModePreview(shown)
+      InFlight:SetPreview("editMode", shown)
     end,
   })
 
   self.SetupEditMode = nil
+end
+
+
+----------------------------------------------------
+function InFlight:CreateSettingsRows(parent, opener)
+----------------------------------------------------
+  -- The layout editor's rows, drawn onto the settings page. Nil where there is no
+  -- edit mode to have registered them with.
+  if not layoutKeys then
+    return nil
+  end
+  return LLS:CreateSettingsFrame("InFlightBar", parent, opener)
 end
 
 

@@ -7,6 +7,13 @@ L["TooltipOption2"] = "<Right-Click> for Settings"
 L["TooltipOption3"] = "<Ctrl Left-Click> to force close"
 L["Duration"] = "Duration: "
 
+-- Settings page in the game's AddOns settings
+L["Menu"] = "Menu"
+L["ShowPreview"] = "Show Preview"
+L["HidePreview"] = "Hide Preview"
+L["PreviewTooltip"] = "Puts a made-up flight on the bar, so you can see your settings without flying anywhere."
+L["PreviewInFlight"] = "The bar is showing your current flight already."
+
 -- Settings menu: what a change applies to
 L["LayoutSpecific"] = "Layout Specific Settings"
 L["LayoutSpecificTooltip"] = "Give the current edit mode layout (%1$s) its own InFlight settings. Everything in this menu then changes that layout alone and your own settings are left as they are. Turning it off puts your own settings back on the bar and keeps the layout's for later."

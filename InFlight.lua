@@ -42,7 +42,7 @@ local taxiSrc, taxiSrcName, taxiDst, taxiDstName, endTime  -- location data
 local porttaken, takeoff, inworld, outworld, ontaxi        -- flags
 local ratio, endText = 0, "??"                             -- cache variables
 local sb, spark, timeText, locText, bord                   -- frame elements
-local previewActive                                        -- edit mode dummy flight
+local previewActive, previewRequests = nil, {}             -- dummy flight, and who wants it
 local totalTime, startTime, elapsed, throt = 0, 0, 0, 0    -- throttle variables
 local oldTakeTaxiNode
 
@@ -63,9 +63,9 @@ end
 InFlight:SetScript("OnEvent", function(this, event, ...) this[event](this, ...) end)
 InFlight:RegisterEvent("ADDON_LOADED")
 
------------------------------------------
+--------------------------------
 function InFlight:ADDON_LOADED()
------------------------------------------
+--------------------------------
   self:RegisterEvent("TAXIMAP_OPENED")
   self:SetupInFlight()
   self:LoadBulk()
@@ -357,13 +357,13 @@ function InFlight:GetFontList()  -- the fonts worth offering on this client
 end
 
 
--- Sample flight for the edit mode dummy. Two real flight points, picked at the
+-- Sample flight for the preview. Two real flight points, picked at the
 -- median length of the 731 names in the defaults, so that the preview shows the
 -- bar carrying about as much text as it usually will.
 local previewTotal, previewDone = 90, 54
 local previewSrcName, previewDstName = "Menethil Harbor", "Nethergarde Keep"
 
-local function SetToPreview()  -- fill the bar with a dummy flight for the edit mode
+local function SetToPreview()  -- fill the bar with the preview's dummy flight
   local barcolor = look.barcolor or {r = 0.5, g = 0.5, b = 0.8, a = 1.0}
   -- The spark rides the filled edge, so it takes the bar's value rather than the
   -- elapsed time, which are the same thing only when Fill Up is on.
@@ -500,34 +500,154 @@ function InFlight:SetupInFlight()
   SLASH_INFLIGHT1 = "/inflight"
 
 
-  -- The addon settings panel.
+  -- The addon settings panel. It scrolls, because with the bar's settings on it
+  -- the page is taller than the settings window.
   local panel = CreateFrame("Frame")
-    
-  local t1 = panel:CreateFontString(nil, "ARTWORK")
+  -- Hidden until the settings window shows it. It only calls Show, which does
+  -- nothing to a frame that is already shown, so OnShow would never run the
+  -- first time the page is opened.
+  panel:Hide()
+
+  local scroll = CreateFrame("ScrollFrame", nil, panel, "ScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", 0, -4)
+  scroll:SetPoint("BOTTOMRIGHT", -28, 4)
+  local content = CreateFrame("Frame", nil, scroll)
+  content:SetSize(1, 1)
+  scroll:SetScrollChild(content)
+
+  local t1 = content:CreateFontString(nil, "ARTWORK")
   t1:SetFontObject(GameFontNormalLarge)
   t1:SetJustifyH("LEFT")
   t1:SetJustifyV("TOP")
-  t1:SetPoint("TOPLEFT", 16, -16)
+  t1:SetPoint("TOPLEFT", 16, -12)
   t1:SetText("|cff0040ffIn|cff00aaffFlight|r")
-  panel.tl = t1
 
-  local t2 = panel:CreateFontString(nil, "ARTWORK")
+  local t2 = content:CreateFontString(nil, "ARTWORK")
   t2:SetFontObject(GameFontHighlight)
   t2:SetJustifyH("LEFT")
   t2:SetJustifyV("TOP")
-  SetPoints(t2, "TOPLEFT", t1, "BOTTOMLEFT", 0, -8, "RIGHT", panel, "RIGHT", -32, 0)
+  SetPoints(t2, "TOPLEFT", t1, "BOTTOMLEFT", 0, -8, "RIGHT", content, "RIGHT", -16, 0)
   t2:SetNonSpaceWrap(true)
   local function GetInfo(field)
     return C_AddOns.GetAddOnMetadata("InFlight", field) or "N/A"
   end
   t2:SetFormattedText("|cff00aaffAuthor:|r %s\n|cff00aaffVersion:|r %s\n\n%s|r", GetInfo("Author"), GetInfo("Version"), GetInfo("Notes"))
 
-  local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-  b:SetText(_G.GAMEOPTIONS_MENU)
-  b:SetWidth(max(120, b:GetTextWidth() + 20))
-  b:SetScript("OnClick", InFlight.ShowSettings)
-  b:SetPoint("TOPLEFT", t2, "BOTTOMLEFT", -2, -8)
-  
+  -- The settings menu, the same one right-clicking the bar opens.
+  local menuButton = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+  menuButton:SetText(L["Menu"])
+  menuButton:SetWidth(max(120, menuButton:GetTextWidth() + 20))
+  menuButton:SetScript("OnClick", InFlight.ShowSettings)
+  menuButton:SetPoint("TOPLEFT", t2, "BOTTOMLEFT", -2, -8)
+
+  -- A made-up flight on the bar, to see the settings without flying anywhere.
+  -- Greyed out while a real flight is on the bar, which shows them already.
+  local previewButton = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+  previewButton:SetPoint("LEFT", menuButton, "RIGHT", 8, 0)
+  previewButton:SetMotionScriptsWhileDisabled(true)
+  -- Wide enough for either label, so that it does not change size when clicked.
+  previewButton:SetText(L["HidePreview"])
+  local labelWidth = previewButton:GetTextWidth()
+  previewButton:SetText(L["ShowPreview"])
+  previewButton:SetWidth(max(120, labelWidth + 20, previewButton:GetTextWidth() + 20))
+
+  local function RefreshPreviewButton()
+    previewButton:SetEnabled(not InFlight:IsShown())
+    previewButton:SetText(previewRequests.settings and L["HidePreview"] or L["ShowPreview"])
+  end
+
+  previewButton:SetScript("OnClick", function()
+    InFlight:SetPreview("settings", not previewRequests.settings)
+    RefreshPreviewButton()
+  end)
+  previewButton:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip_SetTitle(GameTooltip, self:GetText())
+    GameTooltip_AddNormalLine(GameTooltip, L["PreviewTooltip"], true)
+    if not self:IsEnabled() then
+      GameTooltip_AddBlankLineToTooltip(GameTooltip)
+      GameTooltip_AddErrorLine(GameTooltip, L["PreviewInFlight"], true)
+    end
+    GameTooltip:Show()
+  end)
+  previewButton:SetScript("OnLeave", GameTooltip_Hide)
+
+  -- The InFlight frame runs only while a real flight does, so its showing and
+  -- hiding is a flight starting and ending, which may happen with the page open.
+  -- Taking off also ends the preview, which the label has to follow.
+  InFlight:HookScript("OnShow", RefreshPreviewButton)
+  InFlight:HookScript("OnHide", RefreshPreviewButton)
+
+  -- Below the buttons and a divider, the same rows the layout editor shows for
+  -- the bar. They change whatever the settings menu changes, and their Revert
+  -- Changes goes back to how the bar looked when the page was opened. Drawn when
+  -- the page is first opened, because the edit mode registration needs the saved
+  -- variables. The library places its rows 26 in from its frame's left edge and
+  -- the buttons sit 2 left of the text above them, hence the offset that lines
+  -- the row labels up with that text.
+  local rows, divider
+
+  -- The scroll range has to reach the last thing shown, which is only laid out
+  -- by the frame after the page shows or changes.
+  local function FitContent()
+    local last = rows and rows:IsShown() and rows or menuButton
+    local top, bottom = content:GetTop(), last:GetBottom()
+    if top and bottom then
+      content:SetHeight(top - bottom + 16)
+    end
+  end
+
+  -- A scroll child takes no size from anchors, so it follows the scroll frame's
+  -- width by hand. The text above the buttons wraps to it.
+  scroll:HookScript("OnSizeChanged", function(_, width)
+    content:SetWidth(width)
+    C_Timer.After(0, FitContent)
+  end)
+
+  -- The rows only show while the bar does, as a flight or the preview, because
+  -- what they change is how it looks.
+  local function ShowRowsWithBar()
+    local shown = InFlight:GetBar():IsShown()
+    rows:SetShown(shown)
+    divider:SetShown(shown)
+    C_Timer.After(0, FitContent)
+  end
+
+  panel:SetScript("OnShow", function()
+    if not rows then
+      -- Opened by the whole page, so that the rows hiding and showing with the
+      -- bar does not move the point their Revert Changes goes back to.
+      rows = InFlight:CreateSettingsRows(content, panel)
+      if rows then
+        -- 32 down leaves the divider 16 and 8 either side of it.
+        rows:SetPoint("TOPLEFT", menuButton, "BOTTOMLEFT", 2 - 26, -32)
+
+        -- The divider the library draws between rows, centred over them the
+        -- way it centres its own.
+        divider = content:CreateTexture(nil, "ARTWORK")
+        divider:SetTexture([[Interface\FriendsFrame\UI-FriendsFrame-OnlineDivider]])
+        divider:SetSize(330, 16)
+        divider:SetPoint("BOTTOM", rows, "TOP", 0, 8)
+
+        local bar = InFlight:GetBar()
+        bar:HookScript("OnShow", ShowRowsWithBar)
+        bar:HookScript("OnHide", ShowRowsWithBar)
+      end
+    end
+    if rows then
+      ShowRowsWithBar()
+    end
+    RefreshPreviewButton()
+    InFlight:SetBarAboveSettings(true)
+  end)
+
+  -- The preview belongs to this page, so leaving the page takes it away, and the
+  -- bar goes back below the rest of the interface.
+  panel:SetScript("OnHide", function()
+    InFlight:SetPreview("settings", false)
+    InFlight:SetBarAboveSettings(false)
+  end)
+
   panel.name = "InFlight"
   
   local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
@@ -955,8 +1075,9 @@ end
 ----------------------------------
 function InFlight:StartTimer(slot)  -- lift off
 ----------------------------------
-  -- A real flight always wins over the edit mode dummy.
+  -- A real flight always wins over the preview, and ends every request for it.
   previewActive = nil
+  wipe(previewRequests)
 
   Dismount()
   if CanExitVehicle() == 1 then
@@ -1003,9 +1124,9 @@ function InFlight:StartTimer(slot)  -- lift off
 end
 
 
--------------------------------
+----------------------------------
 function InFlight:RememberFlight()
--------------------------------
+----------------------------------
   if not self.db then
     return
   end
@@ -1032,9 +1153,9 @@ function InFlight:RememberFlight()
 end
 
 
----------------------------------------------
+----------------------------------------------
 function InFlight:RecoverFlight(isReloadingUi)  -- pick a flight back up after a UI reload
----------------------------------------------
+----------------------------------------------
   local saved = self.db and self.db.char.inTransit
   if not saved then
     return
@@ -1424,9 +1545,9 @@ do  -- timer bar
     timeText:SetShadowOffset(1, -1)
     timeText:SetTextColor(fontcolor.r or 1.0, fontcolor.g or 1.0, fontcolor.b or 1.0, fontcolor.a or 1.0)
 
-    -- The edit mode dummy shows names of its own rather than writing them into
-    -- the flight's variables, which a flight master opened during edit mode would
-    -- then fill in for real and closing edit mode would wipe out again.
+    -- The preview shows names of its own rather than writing them into the
+    -- flight's variables, which a flight master opened during the preview would
+    -- then fill in for real and ending the preview would wipe out again.
     local srcName = previewActive and previewSrcName or taxiSrcName or "??"
     local dstName = previewActive and previewDstName or taxiDstName or "??"
 
@@ -1464,18 +1585,36 @@ do  -- timer bar
     end
   end
 
-  ---------------------------
+  --------------------------
   function InFlight:GetBar()  -- the timer bar, created on first use
-  ---------------------------
+  --------------------------
     if not sb then
       self:CreateBar()
     end
     return sb
   end
 
-  -------------------------------------
+  --------------------------------------------
+  function InFlight:SetBarAboveSettings(above)  -- while the settings page is open
+  --------------------------------------------
+    -- The settings window is at HIGH, so the bar goes one up to DIALOG to be
+    -- watched while it is changed. The colour picker is at DIALOG too, but as a
+    -- top level frame it is raised above the bar when it opens. The border, a
+    -- strata below the bar normally, goes a level below it within DIALOG.
+    self:GetBar()
+    if above then
+      sb:SetFrameStrata("DIALOG")
+      bord:SetFrameStrata("DIALOG")
+      bord:SetFrameLevel(max(0, sb:GetFrameLevel() - 1))
+    else
+      sb:SetFrameStrata("MEDIUM")
+      bord:SetFrameStrata("LOW")
+    end
+  end
+
+  ------------------------------------
   function InFlight:ApplyBarPosition()
-  -------------------------------------
+  ------------------------------------
     if not sb then
       return
     end
@@ -1483,10 +1622,13 @@ do  -- timer bar
     sb:SetPoint(look.p, UIParent, look.rp, look.x, look.y)
   end
 
-  --------------------------------------------------
-  function InFlight:SetEditModePreview(shown)  -- dummy flight while the edit mode is open
-  --------------------------------------------------
-    if shown then
+  ----------------------------------------------
+  function InFlight:SetPreview(requester, shown)  -- dummy flight for edit mode and the settings page
+  ----------------------------------------------
+    -- Shown while anyone still wants it, so that edit mode closing does not take
+    -- it away from the settings page, or the other way round.
+    previewRequests[requester] = shown or nil
+    if next(previewRequests) then
       if previewActive or takeoff or ontaxi then
         return
       end
@@ -1535,9 +1677,9 @@ end
 local profileCompareSkip = { perchar = true }
 
 
-----------------------------------------------------------
+------------------------------------------------------------
 function InFlight:ProfileDiffersFromAccountWide(profileName)
-----------------------------------------------------------
+------------------------------------------------------------
   local stored = self.db.profiles
   if not stored or not stored[profileName] then
     return false
@@ -1547,9 +1689,9 @@ function InFlight:ProfileDiffersFromAccountWide(profileName)
 end
 
 
------------------------------------------
+---------------------------------------
 function InFlight:GetCopyableProfiles()
------------------------------------------
+---------------------------------------
   -- The account wide settings always, because every character has them, and then
   -- any character's own settings that actually say something different. A profile
   -- identical to the account wide one would be an entry that copies nothing.
@@ -1562,6 +1704,40 @@ function InFlight:GetCopyableProfiles()
   end
 
   return found
+end
+
+
+----------------------------------
+function InFlight:ProfileChanged()  -- another set of the user's own settings is in use
+----------------------------------
+  -- The profile itself was swapped or wiped, rather than one setting in it
+  -- changing. A layout's overrides are untouched by that, so a layout owning the
+  -- bar has nothing new to capture, but capturing is also what tells the
+  -- settings page to show the new values.
+  profile = self.db.profile
+  self:ApplyBarPosition()
+  self:UpdateLook()
+  self:CaptureEditModeLayout()
+end
+
+
+-----------------------------------
+function InFlight:ResetToDefaults()
+-----------------------------------
+  -- Resets whatever the settings are editing right now: the active layout's own
+  -- settings, or the user's own, which are account wide or character specific
+  -- depending on the other checkbox. Shared by the settings menu, the settings
+  -- page and the layout editor, which all edit the same thing.
+  if self:IsLayoutSpecific() then
+    self:ResetLayoutToDefaults()
+    return
+  end
+
+  self.db:ResetProfile()
+  if self.db:GetCurrentProfile() ~= "Default" then
+    self.db.profile.perchar = true
+  end
+  self:ProfileChanged()
 end
 
 
@@ -1585,18 +1761,18 @@ function InFlight:SetLookOverride(key, value)  -- a layout's own value for this 
 end
 
 
----------------------------------------
+--------------------------------------
 function InFlight:ClearLookOverrides()  -- back to the user's own settings
----------------------------------------
+--------------------------------------
   wipe(look)
   self:ApplyBarPosition()
   self:UpdateLook()
 end
 
 
----------------------------------------
+-------------------------------------
 function InFlight:SetLook(key, value)  -- a setting changed outside the layout editor
----------------------------------------
+-------------------------------------
   -- Where the change lands is what the "Layout Specific Settings" checkbox
   -- decides: the layout that owns the bar, or the user's own settings. A change
   -- never goes to both, so nothing is rewritten behind the user's back.
@@ -1642,9 +1818,9 @@ InFlight.tooltips = {
 }
 
 
--------------------------------
+--------------------------------
 function InFlight.ShowSettings()
--------------------------------
+--------------------------------
   -- Helper: Redraw the bar and let the edit mode layout, if one owns the bar,
   -- take the change on board. Everything in this menu is meant to stick.
   local function UpdateLook()
@@ -1684,15 +1860,6 @@ function InFlight.ShowSettings()
     return entry
   end
 
-  -- Helper: The profile itself was swapped or wiped, rather than one setting in
-  -- it changing. The layout's overrides are untouched by that, so there is
-  -- nothing to capture, only a redraw against whatever the profile now holds.
-  local function ProfileChanged()
-    profile = InFlight.db.profile
-    InFlight:ApplyBarPosition()
-    InFlight:UpdateLook()
-  end
-
   -- Helper: Open dialog to edit the "to" text separator
   local function ShowToTextDialog()
     StaticPopupDialogs["InFlightToText"] = StaticPopupDialogs["InFlightToText"] or {
@@ -1726,23 +1893,6 @@ function InFlight.ShowSettings()
       timeout = 0, exclusive = 1, whileDead = 1, hideOnEscape = 1,
     }
     StaticPopup_Show("InFlightToText")
-  end
-
-  -- Helper: Reset all settings to defaults
-  local function ResetToDefaults()
-    -- Resets whatever this menu is currently editing: the active layout's own
-    -- settings, or the user's own, which are account wide or character specific
-    -- depending on the other checkbox.
-    if InFlight:IsLayoutSpecific() then
-      InFlight:ResetLayoutToDefaults()
-      return
-    end
-
-    InFlight.db:ResetProfile()
-    if InFlight.db:GetCurrentProfile() ~= "Default" then
-      profile.perchar = true
-    end
-    ProfileChanged()
   end
 
   -- Helper: Clear flight time database and reload UI
@@ -1787,7 +1937,7 @@ function InFlight.ShowSettings()
         break
       end
     end
-    ProfileChanged()
+    InFlight:ProfileChanged()
   end
 
   -- Helper: Ask before one set of settings is lost for the other
@@ -1833,7 +1983,7 @@ function InFlight.ShowSettings()
       InFlight.db:CopyProfile("Default")
       profile = InFlight.db.profile
       profile.perchar = true
-      ProfileChanged()
+      InFlight:ProfileChanged()
     end
   end
 
@@ -2120,7 +2270,7 @@ function InFlight.ShowSettings()
     otherMenu:CreateDivider()
 
     otherMenu:CreateButton(L["ResetToDefaults"], function()
-      ResetToDefaults()
+      InFlight:ResetToDefaults()
     end):SetTitleAndTextTooltip(L["ResetToDefaults"], L["ResetToDefaultsTooltip"])
 
     otherMenu:CreateDivider()
