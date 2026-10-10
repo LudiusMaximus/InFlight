@@ -1,49 +1,61 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("InFlight", "frFR")
 if not L then return end
 
-L["ExportMessage"] = "Merci d'avoir partagé vos nouvelles routes de vol découvertes !\nVeuillez copier le texte ci-dessous dans le presse-papiers (CTRL-C) et le publier sur l'un des sites suivants :"
-L["Dismiss"] = "Fermer"
-L["Select All"] = "Tout sélectionner"
-
-L["AddonDisabled"] = "Mauvaise version du client détectée: désactivation de l'addon"
-L["BackgroundColor"] = "Couleur de Fond"
-L["BarColor"] = "Couleur de Remplissage"
-L["BarOptions"] = "Status Options"
-L["Border"] = "Bordure"
-L["BorderColor"] = "Couleur de la Bordure"
-L["CompactMode"] = "Mode Compact"
-L["ConfirmFlight"] = "Confirmer votre vol"
-L["ConfirmPopup"] = "Prenez votre envol pour %s?"
-L["CountUp"] = "Compter jusqu'à"
-L["DefaultsUpdated"] = "Données par défaut mises à jour."
-L["DestParse"] = ", .+"
-L["Duration"] = "Durée: "
-L["Enter your 'to' text."] = "Saisissez votre texte 'à'."
-L["ExportFlightTimes"] = "Exporter les temps de vol"
-L["FillUp"] = "Compléter"
-L["FlightTimeAdded"] = "temps de vol ajouté:"
-L["FlightTimeContribute"] = "%s temps de vol disponibles pour contribuer. Entrez \"/inflight export\" pour partager."
-L["FlightTimeUpdated"] = "temps de vol mis à jour:"
-L["Font"] = "Font"
-L["FontColor"] = "Couleur de Font"
-L["Height"] = "Hauteur"
-L["OutlineInfo"] = "Contour du Texte"
-L["OutlineTime"] = "Contour le Time"
-L["PerCharOptions"] = "Options Spécifiques aux Personnages"
-L["ResetFlightTimes"] = "Réinitialiser les Temps de Vol"
-L["ResetOptions"] = "Réinitialiser les Options"
-L["ShowChat"] = "Messages de Chat"
-L["ShowSpark"] = "Montrer l'étincelle"
-L["TextOptions"] = "Options du Texte"
-L["Texture"] = "Texture"
+-- Mouseover on the bar itself
 L["TooltipOption1"] = "<Shift Clic-Gauche> pour se déplacer"
 L["TooltipOption2"] = "<Clic-Droit> pour les Options"
 L["TooltipOption3"] = "<Ctrl Clic-Gauche> pour forcer la fermeture"
-L["ToText"] = "\"Après\" Text"
-L["TwoLines"] = "Texte sur deux lignes"
-L["UnknownColor"] = "Couleur Inconnu"
-L["Width"] = "Largeur"
+L["Duration"] = "Durée: "
 
+-- Settings menu: what a change applies to
+L["PerCharOptions"] = "Options Spécifiques aux Personnages"
+
+-- Settings menu: Bar Settings
+L["BarOptions"] = "Status Options"
+L["Height"] = "Hauteur"
+L["Width"] = "Largeur"
+L["Texture"] = "Texture"
+L["Border"] = "Bordure"
+L["BarColor"] = "Couleur de Remplissage"
+L["UnknownColor"] = "Couleur Inconnu"
+L["BackgroundColor"] = "Couleur de Fond"
+L["BorderColor"] = "Couleur de la Bordure"
+L["CountUp"] = "Compter jusqu'à"
+L["FillUp"] = "Compléter"
+L["ShowSpark"] = "Montrer l'étincelle"
+
+-- Settings menu: Text Settings
+L["TextOptions"] = "Options du Texte"
+L["Font"] = "Font"
+L["FontColor"] = "Couleur de Font"
+L["OutlineInfo"] = "Contour du Texte"
+L["OutlineTime"] = "Contour le Time"
+L["CompactMode"] = "Mode Compact"
+L["TwoLines"] = "Texte sur deux lignes"
+L["ToText"] = "\"Après\" Text"
+L["Enter your 'to' text."] = "Saisissez votre texte 'à'."
+
+-- Settings menu: Other
+L["ShowChat"] = "Messages de Chat"
+L["ConfirmFlight"] = "Confirmer votre vol"
+L["ConfirmPopup"] = "Prenez votre envol pour %s?"
+L["ResetFlightTimes"] = "Réinitialiser les Temps de Vol"
+L["ExportFlightTimes"] = "Exporter les temps de vol"
+
+-- Chat messages
+L["FlightTimeAdded"] = "temps de vol ajouté:"
+L["FlightTimeUpdated"] = "temps de vol mis à jour:"
+L["FlightTimeContribute"] = "%s temps de vol disponibles pour contribuer. Entrez \"/inflight export\" pour partager."
+
+-- Export window
+L["ExportMessage"] = "Merci d'avoir partagé vos nouvelles routes de vol découvertes !\nVeuillez copier le texte ci-dessous dans le presse-papiers (CTRL-C) et le publier sur l'un des sites suivants :"
+L["Select All"] = "Tout sélectionner"
+L["Dismiss"] = "Fermer"
+
+-- Parsing
+L["DestParse"] = ", .+"
+
+-- Flight points and gossip options, looked up by name while in flight
 L["Amber Ledge"] = "Escarpement d’Ambre"
 L["AmberLedgeGossip"] = "Je voudrais aller au Bouclier Transitus"
 L["Argent Tournament Grounds"] = "Enceinte du tournoi d’Argent"

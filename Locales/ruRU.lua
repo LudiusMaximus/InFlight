@@ -1,49 +1,61 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("InFlight", "ruRU")
 if not L then return end
 
-L["ExportMessage"] = "Спасибо, что поделились вашими новыми обнаруженными маршрутами полета!\nПожалуйста, скопируйте текст ниже в буфер обмена (CTRL-C) и разместите его на одном из следующих веб-сайтов:"
-L["Dismiss"] = "Закрыть"
-L["Select All"] = "Выбрать все"
-
-L["AddonDisabled"] = "Обнаружена неверная версия клиента: отключение аддона"
-L["BackgroundColor"] = "Цвет фона"
-L["BarColor"] = "Цвет полосы"
-L["BarOptions"] = "Опции полосы"
-L["Border"] = "Граница"
-L["BorderColor"] = "Цвет границы"
-L["CompactMode"] = "Компактный режим"
-L["ConfirmFlight"] = "Подтвердить полет"
-L["ConfirmPopup"] = "Лететь в %s?"
-L["CountUp"] = "Посчитать"
-L["DefaultsUpdated"] = "Данные по умолчанию обновлены."
-L["DestParse"] = ", .+"
-L["Duration"] = "Продолжительность полета: "
-L["Enter your 'to' text."] = "Введите текст 'до'."
-L["ExportFlightTimes"] = "Экспортировать время полетов"
-L["FillUp"] = "Заполнять"
-L["FlightTimeAdded"] = "добавлено время полета:"
-L["FlightTimeContribute"] = "%s раз полета доступны для вклада. Введите \"/inflight export\", чтобы поделиться."
-L["FlightTimeUpdated"] = "Время полета обновлено:"
-L["Font"] = "Шрифт"
-L["FontColor"] = "Цвет шрифта"
-L["Height"] = "Высота"
-L["OutlineInfo"] = "Контур информации"
-L["OutlineTime"] = "Контур времени"
-L["PerCharOptions"] = "Параметры, специфичные для персонажа"
-L["ResetFlightTimes"] = "Сброс времени полета"
-L["ResetOptions"] = "Сброс настроек"
-L["ShowChat"] = "Сообщения чата"
-L["ShowSpark"] = "Показать искру"
-L["TextOptions"] = "Опции текста"
-L["Texture"] = "Текстура"
+-- Mouseover on the bar itself
 L["TooltipOption1"] = "[Shift + ЛКМ] - переместить иконку миникарты"
 L["TooltipOption2"] = "[ПКМ] - открыть настройки"
 L["TooltipOption3"] = "[Ctrl + ЛКМ] - принудительно закрыть окно"
-L["ToText"] = "\"в\" Текст"
-L["TwoLines"] = "Отображать в две строки"
-L["UnknownColor"] = "Неизвестный цвет"
-L["Width"] = "Ширина"
+L["Duration"] = "Продолжительность полета: "
 
+-- Settings menu: what a change applies to
+L["PerCharOptions"] = "Параметры, специфичные для персонажа"
+
+-- Settings menu: Bar Settings
+L["BarOptions"] = "Опции полосы"
+L["Height"] = "Высота"
+L["Width"] = "Ширина"
+L["Texture"] = "Текстура"
+L["Border"] = "Граница"
+L["BarColor"] = "Цвет полосы"
+L["UnknownColor"] = "Неизвестный цвет"
+L["BackgroundColor"] = "Цвет фона"
+L["BorderColor"] = "Цвет границы"
+L["CountUp"] = "Посчитать"
+L["FillUp"] = "Заполнять"
+L["ShowSpark"] = "Показать искру"
+
+-- Settings menu: Text Settings
+L["TextOptions"] = "Опции текста"
+L["Font"] = "Шрифт"
+L["FontColor"] = "Цвет шрифта"
+L["OutlineInfo"] = "Контур информации"
+L["OutlineTime"] = "Контур времени"
+L["CompactMode"] = "Компактный режим"
+L["TwoLines"] = "Отображать в две строки"
+L["ToText"] = "\"в\" Текст"
+L["Enter your 'to' text."] = "Введите текст 'до'."
+
+-- Settings menu: Other
+L["ShowChat"] = "Сообщения чата"
+L["ConfirmFlight"] = "Подтвердить полет"
+L["ConfirmPopup"] = "Лететь в %s?"
+L["ResetFlightTimes"] = "Сброс времени полета"
+L["ExportFlightTimes"] = "Экспортировать время полетов"
+
+-- Chat messages
+L["FlightTimeAdded"] = "добавлено время полета:"
+L["FlightTimeUpdated"] = "Время полета обновлено:"
+L["FlightTimeContribute"] = "%s раз полета доступны для вклада. Введите \"/inflight export\", чтобы поделиться."
+
+-- Export window
+L["ExportMessage"] = "Спасибо, что поделились вашими новыми обнаруженными маршрутами полета!\nПожалуйста, скопируйте текст ниже в буфер обмена (CTRL-C) и разместите его на одном из следующих веб-сайтов:"
+L["Select All"] = "Выбрать все"
+L["Dismiss"] = "Закрыть"
+
+-- Parsing
+L["DestParse"] = ", .+"
+
+-- Flight points and gossip options, looked up by name while in flight
 L["Amber Ledge"] = "Янтарная гряда"
 L["AmberLedgeGossip"] = "Мне хотелось бы отправиться за Маскировочный щит"
 L["Argent Tournament Grounds"] = "Ристалище Серебряного турнира"

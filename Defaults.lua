@@ -19,7 +19,7 @@ InFlight.defaults = {
     bordercolor = { r = 0.6, g = 0.6, b = 0.6, a = 0.8, },
     inline = false,
     twolines = false,
-    totext = " >--In Route To--> ",
+    totext = "->",
     font = "2002 Bold",
     fontsize = 12,
     fontcolor = { r = 1.0, g = 1.0, b = 1.0, a = 1.0, },

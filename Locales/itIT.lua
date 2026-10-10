@@ -1,49 +1,61 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("InFlight", "itIT")
 if not L then return end
 
-L["ExportMessage"] = "Grazie per aver condiviso i tuoi nuovi percorsi di volo scoperti!\nPer favore, copia il testo qui sotto negli appunti (CTRL-C) e postalo su uno dei seguenti siti web:"
-L["Dismiss"] = "Chiudi"
-L["Select All"] = "Seleziona Tutto"
-
-L["AddonDisabled"] = "Rilevata versione client errata: disabilitazione del componente aggiuntivo"
-L["BackgroundColor"] = "Colore di Sfondo"
-L["BarColor"] = "Colore della Barra"
-L["BarOptions"] = "Opzioni della Barra"
-L["Border"] = "Bordo"
-L["BorderColor"] = "Colore del Bordo"
-L["CompactMode"] = "Modalit‡ Compatta"
-L["ConfirmFlight"] = "Confermare Volo"
-L["ConfirmPopup"] = "Prendi il volo per %s?"
-L["CountUp"] = "Conto alla rovescia"
-L["DefaultsUpdated"] = "Dati predefiniti aggiornati."
-L["DestParse"] = ", .+"
-L["Duration"] = "Durata:"
-L["Enter your 'to' text."] = "Inserisci il tuo testo 'a'."
-L["ExportFlightTimes"] = "Esportare i Tempi di Volo"
-L["FillUp"] = "Colmare"
-L["FlightTimeAdded"] = "tempo di volo aggiunto:"
-L["FlightTimeContribute"] = "%s tempo di volo disponibile per contribuire. Inserisci \"/inflight export\" per condividere."
-L["FlightTimeUpdated"] = "orario di volo aggiornato:"
-L["Font"] = "Font"
-L["FontColor"] = "Colore del Carattere"
-L["Height"] = "Altezza"
-L["OutlineInfo"] = "Delineare le Informazioni"
-L["OutlineTime"] = "Delineare il Tempo"
-L["PerCharOptions"] = "Opzioni Specifiche del Personaggio"
-L["ResetFlightTimes"] = "Reimposta i Tempi di Volo"
-L["ResetOptions"] = "Reimpostare le Opzioni"
-L["ShowChat"] = "Messaggi di Chat"
-L["ShowSpark"] = "Mostra Spark"
-L["TextOptions"] = "Opzioni di Testo"
-L["Texture"] = "Aspetto"
+-- Mouseover on the bar itself
 L["TooltipOption1"] = "<Shift Sinistra-Click> per spostare"
 L["TooltipOption2"] = "<Right-Click> per le Opzioni"
 L["TooltipOption3"] = "<Ctrl Sinistro-Click> per forzare vicino"
-L["ToText"] = "\"Verso\" Testo"
-L["TwoLines"] = "Testo su due righe"
-L["UnknownColor"] = "Colore Sconosciuto"
-L["Width"] = "Larghezza"
+L["Duration"] = "Durata:"
 
+-- Settings menu: what a change applies to
+L["PerCharOptions"] = "Opzioni Specifiche del Personaggio"
+
+-- Settings menu: Bar Settings
+L["BarOptions"] = "Opzioni della Barra"
+L["Height"] = "Altezza"
+L["Width"] = "Larghezza"
+L["Texture"] = "Aspetto"
+L["Border"] = "Bordo"
+L["BarColor"] = "Colore della Barra"
+L["UnknownColor"] = "Colore Sconosciuto"
+L["BackgroundColor"] = "Colore di Sfondo"
+L["BorderColor"] = "Colore del Bordo"
+L["CountUp"] = "Conto alla rovescia"
+L["FillUp"] = "Colmare"
+L["ShowSpark"] = "Mostra Spark"
+
+-- Settings menu: Text Settings
+L["TextOptions"] = "Opzioni di Testo"
+L["Font"] = "Font"
+L["FontColor"] = "Colore del Carattere"
+L["OutlineInfo"] = "Delineare le Informazioni"
+L["OutlineTime"] = "Delineare il Tempo"
+L["CompactMode"] = "Modalit√† Compatta"
+L["TwoLines"] = "Testo su due righe"
+L["ToText"] = "\"Verso\" Testo"
+L["Enter your 'to' text."] = "Inserisci il tuo testo 'a'."
+
+-- Settings menu: Other
+L["ShowChat"] = "Messaggi di Chat"
+L["ConfirmFlight"] = "Confermare Volo"
+L["ConfirmPopup"] = "Prendi il volo per %s?"
+L["ResetFlightTimes"] = "Reimposta i Tempi di Volo"
+L["ExportFlightTimes"] = "Esportare i Tempi di Volo"
+
+-- Chat messages
+L["FlightTimeAdded"] = "tempo di volo aggiunto:"
+L["FlightTimeUpdated"] = "orario di volo aggiornato:"
+L["FlightTimeContribute"] = "%s tempo di volo disponibile per contribuire. Inserisci \"/inflight export\" per condividere."
+
+-- Export window
+L["ExportMessage"] = "Grazie per aver condiviso i tuoi nuovi percorsi di volo scoperti!\nPer favore, copia il testo qui sotto negli appunti (CTRL-C) e postalo su uno dei seguenti siti web:"
+L["Select All"] = "Seleziona Tutto"
+L["Dismiss"] = "Chiudi"
+
+-- Parsing
+L["DestParse"] = ", .+"
+
+-- Flight points and gossip options, looked up by name while in flight
 L["Amber Ledge"] = "Scogliera d'Ambra"
 L["AmberLedgeGossip"] = "Vorrei un passaggio per la Cupola di Transito"
 L["Argent Tournament Grounds"] = "Campi del Torneo d'Argento"
@@ -73,7 +85,7 @@ L["Shatter Point"] = "Presidio di Torre Infranta"
 L["Shattered Sun Staging Area"] = "Base Operativa del Sole Infranto"
 L["ShatterPointGossip"] = "Mandami al Presidio dell'Onore"
 L["Skyguard Outpost"] = "Avamposto dei Guardacieli"
-L["SkyguardOutpostGossip"] = "SÏ, vorrei raggiungere l'Aerodromo di Ventotetro"
+L["SkyguardOutpostGossip"] = "S√¨, vorrei raggiungere l'Aerodromo di Ventotetro"
 L["SSSAGossip"] = "A proposito d'azione, mi hanno ordinato di eseguire un assalto aereo"
 L["SSSAGossip2"] = "Devo intercettare i rinforzi della Lama d'Aurora"
 L["Stormwind City"] = "Roccavento"

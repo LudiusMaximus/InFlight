@@ -1,19 +1,32 @@
-﻿## Interface: 120007
+﻿## Interface: 120100, 50504, 20506, 11509
 ## Version: @project-version@
 ## Title: InFlight
 ## IconAtlas: Taxi_Frame_Yellow
 ## Author: TotalPackage, Deranjata, LudiusMaximus
-## Notes: Status bar timer for your flight paths
-## Notes-deDE: Zeitanzeigeleiste für Flugrouten
-## Notes-esES: Temporizador barra de estado para sus rutas de vuelo
-## Notes-esMX: Temporizador barra de estado para sus rutas de vuelo
-## Notes-frFR: Minuterie de barre d'état pour vos trajectoires de vol
-## Notes-itIT: Timer della barra di stato per le tue traiettorie di volo
-## Notes-koKR: 비행 경로에 대한 상태 표시 줄 타이머
-## Notes-ptBR: Temporizador da barra de status para suas rotas de voo
-## Notes-ruRU: Таймер строки состояния для Ваших маршрутов полета
-## Notes-zhCN: 您的航班路径的状态栏计时器
-## Notes-zhTW: 您的航班路徑的狀態欄計時器
+
+## Notes: Status bar timer for your flight paths.
+## Notes-deDE: Zeitanzeigeleiste für Flugrouten.
+## Notes-esES: Temporizador barra de estado para sus rutas de vuelo.
+## Notes-esMX: Temporizador barra de estado para sus rutas de vuelo.
+## Notes-frFR: Minuterie de barre d'état pour vos trajectoires de vol.
+## Notes-itIT: Timer della barra di stato per le tue traiettorie di volo.
+## Notes-koKR: 비행 경로에 대한 상태 표시 줄 타이머.
+## Notes-ptBR: Temporizador da barra de status para suas rotas de voo.
+## Notes-ruRU: Таймер строки состояния для Ваших маршрутов полета.
+## Notes-zhCN: 您的航班路径的状态栏计时器。
+## Notes-zhTW: 您的航班路徑的狀態欄計時器。
+
+## Category: Other
+## Category-deDE: Anderes
+## Category-esES: Otros
+## Category-esMX: Otros
+## Category-frFR: Autre
+## Category-itIT: Altro
+## Category-koKR: 기타
+## Category-ptBR: Outro
+## Category-ruRU: Другое
+## Category-zhCN: 其它
+## Category-zhTW: 其他
 
 ## OptionalDeps: InFlight_Load, Immersion
 ## SavedVariables: InFlightDB
@@ -22,11 +35,14 @@
 ## X-WoWI-ID: 11178
 ## X-Wago-ID: v63oOZ6b
 
+## X-Donate: PayPal:ludiusmaximus@gmail.com
+## X-License: The MIT License (MIT)
 
 embeds.xml
 
 Locales\Locales.xml
 InFlight.lua
 Defaults.lua
+EditMode.lua
 
 Converter.lua

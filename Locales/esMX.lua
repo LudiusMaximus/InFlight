@@ -1,49 +1,61 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("InFlight", "esMX")
 if not L then return end
 
-L["ExportMessage"] = "¡Gracias por compartir tus rutas de vuelo recién descubiertas!\nPor favor, copia el texto de abajo en el portapapeles (CTRL-C) y pégalo en uno de los siguientes sitios web:"
-L["Dismiss"] = "Descartar"
-L["Select All"] = "Seleccionar Todo"
-
-L["AddonDisabled"] = "Se detectó una versión incorrecta del cliente: deshabilitar el complemento"
-L["BackgroundColor"] = "Color del fondo"
-L["BarColor"] = "Color de la barra"
-L["BarOptions"] = "Opciones de la barra"
-L["Border"] = "Borde"
-L["BorderColor"] = "Color del borde"
-L["CompactMode"] = "Modo compacto"
-L["ConfirmFlight"] = "Confirmar Vuelo"
-L["ConfirmPopup"] = "Tomar vuelo a %s?"
-L["CountUp"] = "Contar hasta"
-L["DefaultsUpdated"] = "Datos por defecto actualizados."
-L["DestParse"] = ", .+"
-L["Duration"] = "Duración: "
-L["Enter your 'to' text."] = "Introduce el texto de 'a'."
-L["ExportFlightTimes"] = "Exportar tiempos de vuelo"
-L["FillUp"] = "Rellenar"
-L["FlightTimeAdded"] = "tiempo de vuelo añadido:"
-L["FlightTimeContribute"] = "%s tiempos de vuelo disponibles para contribuir. Ingresa \"/inflight export\" para compartir."
-L["FlightTimeUpdated"] = "tiempo de vuelo actualizado:"
-L["Font"] = "Fuente"
-L["FontColor"] = "Color de la fuente"
-L["Height"] = "Alto"
-L["OutlineInfo"] = "Delinear la Fuente"
-L["OutlineTime"] = "Delinear el Tiempo"
-L["PerCharOptions"] = "Opciones especificas del personaje"
-L["ResetFlightTimes"] = "Restablecer tiempos de vuelo"
-L["ResetOptions"] = "Restablecer las opciones"
-L["ShowChat"] = "Mensajes de chat"
-L["ShowSpark"] = "Mostrar Chispa"
-L["TextOptions"] = "Opciones de texto"
-L["Texture"] = "Textura"
+-- Mouseover on the bar itself
 L["TooltipOption1"] = "<Shift Clic-Izquierdo> para mover"
 L["TooltipOption2"] = "<Clic-Derecho> para Opciones"
 L["TooltipOption3"] = "<Ctrl+clic izquierdo> para forzar el cierre"
-L["ToText"] = "Texto \"Hacia\""
-L["TwoLines"] = "Texto a dos líneas"
-L["UnknownColor"] = "Color de desconocido"
-L["Width"] = "Ancho"
+L["Duration"] = "Duración: "
 
+-- Settings menu: what a change applies to
+L["PerCharOptions"] = "Opciones especificas del personaje"
+
+-- Settings menu: Bar Settings
+L["BarOptions"] = "Opciones de la barra"
+L["Height"] = "Alto"
+L["Width"] = "Ancho"
+L["Texture"] = "Textura"
+L["Border"] = "Borde"
+L["BarColor"] = "Color de la barra"
+L["UnknownColor"] = "Color de desconocido"
+L["BackgroundColor"] = "Color del fondo"
+L["BorderColor"] = "Color del borde"
+L["CountUp"] = "Contar hasta"
+L["FillUp"] = "Rellenar"
+L["ShowSpark"] = "Mostrar Chispa"
+
+-- Settings menu: Text Settings
+L["TextOptions"] = "Opciones de texto"
+L["Font"] = "Fuente"
+L["FontColor"] = "Color de la fuente"
+L["OutlineInfo"] = "Delinear la Fuente"
+L["OutlineTime"] = "Delinear el Tiempo"
+L["CompactMode"] = "Modo compacto"
+L["TwoLines"] = "Texto a dos líneas"
+L["ToText"] = "Texto \"Hacia\""
+L["Enter your 'to' text."] = "Introduce el texto de 'a'."
+
+-- Settings menu: Other
+L["ShowChat"] = "Mensajes de chat"
+L["ConfirmFlight"] = "Confirmar Vuelo"
+L["ConfirmPopup"] = "Tomar vuelo a %s?"
+L["ResetFlightTimes"] = "Restablecer tiempos de vuelo"
+L["ExportFlightTimes"] = "Exportar tiempos de vuelo"
+
+-- Chat messages
+L["FlightTimeAdded"] = "tiempo de vuelo añadido:"
+L["FlightTimeUpdated"] = "tiempo de vuelo actualizado:"
+L["FlightTimeContribute"] = "%s tiempos de vuelo disponibles para contribuir. Ingresa \"/inflight export\" para compartir."
+
+-- Export window
+L["ExportMessage"] = "¡Gracias por compartir tus rutas de vuelo recién descubiertas!\nPor favor, copia el texto de abajo en el portapapeles (CTRL-C) y pégalo en uno de los siguientes sitios web:"
+L["Select All"] = "Seleccionar Todo"
+L["Dismiss"] = "Descartar"
+
+-- Parsing
+L["DestParse"] = ", .+"
+
+-- Flight points and gossip options, looked up by name while in flight
 L["Amber Ledge"] = "El Saliente Ámbar"
 L["AmberLedgeGossip"] = "Me gustaría llegar al Escudo de Tránsito"
 L["Argent Tournament Grounds"] = "Campos del Torneo Argenta"

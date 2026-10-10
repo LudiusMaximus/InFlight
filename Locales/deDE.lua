@@ -1,49 +1,61 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("InFlight", "deDE")
 if not L then return end
 
-L["ExportMessage"] = "Danke, dass du deine neu entdeckten Flugrouten teilen möchtest!\nBitte kopiere den unten stehenden Text in die Zwischenablage (STRG-C) und poste ihn auf einer der folgenden Websites:"
-L["Dismiss"] = "Schließen"
-L["Select All"] = "Alles auswählen"
-
-L["AddonDisabled"] = "Falsche Client-Version erkannt: Addon wird deaktiviert"
-L["BackgroundColor"] = "Hintergrundfarbe"
-L["BarColor"] = "Farbe der Leiste"
-L["BarOptions"] = "Leisteneinstellungen"
-L["Border"] = "Rand"
-L["BorderColor"] = "Randfarbe"
-L["CompactMode"] = "Kompaktmodus"
-L["ConfirmFlight"] = "Flug bestätigen"
-L["ConfirmPopup"] = "Flug nehmen nach\n\n%s ?"
-L["CountUp"] = "Hochzählen"
-L["DefaultsUpdated"] = "Standarddaten aktualisiert."
-L["DestParse"] = ", .+"
-L["Duration"] = "Flugdauer: "
-L["Enter your 'to' text."] = "Gib hier deinen 'nach'-Text ein."
-L["ExportFlightTimes"] = "Flugzeiten exportieren"
-L["FillUp"] = "Auffüllen"
-L["FlightTimeAdded"] = "Flugzeit hinzugefügt:"
-L["FlightTimeContribute"] = "Es stehen %s Flugzeiten zur Verfügung, die zur Verbesserung des Addons beitragen könnten. Gib \"/inflight export\" ein, um sie zu teilen."
-L["FlightTimeUpdated"] = "Flugzeit aktualisiert:"
-L["Font"] = "Schriftart"
-L["FontColor"] = "Schriftfarbe"
-L["Height"] = "Höhe"
-L["OutlineInfo"] = "Kontur-Info"
-L["OutlineTime"] = "Kontur-Zeitangabe"
-L["PerCharOptions"] = "Charakterspezifische Einstellungen"
-L["ResetFlightTimes"] = "Flugzeiten zurücksetzen"
-L["ResetOptions"] = "Einstellungen zurücksetzen"
-L["ShowChat"] = "Chat-Nachrichten"
-L["ShowSpark"] = "Funken anzeigen"
-L["TextOptions"] = "Texteinstellungen"
-L["Texture"] = "Textur"
+-- Mouseover on the bar itself
 L["TooltipOption1"] = "<Umschalttaste+Linksklick> zum Bewegen"
 L["TooltipOption2"] = "<Rechtsklick> für Einstellungen"
 L["TooltipOption3"] = "<Strg+Linksklick> schließen erzwingen"
-L["ToText"] = "\"Nach\" Text"
-L["TwoLines"] = "Zweizeilig"
-L["UnknownColor"] = "Unbekannt-Farbe"
-L["Width"] = "Breite"
+L["Duration"] = "Flugdauer: "
 
+-- Settings menu: what a change applies to
+L["PerCharOptions"] = "Charakterspezifische Einstellungen"
+
+-- Settings menu: Bar Settings
+L["BarOptions"] = "Leisteneinstellungen"
+L["Height"] = "Höhe"
+L["Width"] = "Breite"
+L["Texture"] = "Textur"
+L["Border"] = "Rand"
+L["BarColor"] = "Farbe der Leiste"
+L["UnknownColor"] = "Unbekannt-Farbe"
+L["BackgroundColor"] = "Hintergrundfarbe"
+L["BorderColor"] = "Randfarbe"
+L["CountUp"] = "Hochzählen"
+L["FillUp"] = "Auffüllen"
+L["ShowSpark"] = "Funken anzeigen"
+
+-- Settings menu: Text Settings
+L["TextOptions"] = "Texteinstellungen"
+L["Font"] = "Schriftart"
+L["FontColor"] = "Schriftfarbe"
+L["OutlineInfo"] = "Kontur-Info"
+L["OutlineTime"] = "Kontur-Zeitangabe"
+L["CompactMode"] = "Kompaktmodus"
+L["TwoLines"] = "Zweizeilig"
+L["ToText"] = "\"Nach\" Text"
+L["Enter your 'to' text."] = "Gib hier deinen 'nach'-Text ein."
+
+-- Settings menu: Other
+L["ShowChat"] = "Chat-Nachrichten"
+L["ConfirmFlight"] = "Flug bestätigen"
+L["ConfirmPopup"] = "Flug nehmen nach\n\n%s ?"
+L["ResetFlightTimes"] = "Flugzeiten zurücksetzen"
+L["ExportFlightTimes"] = "Flugzeiten exportieren"
+
+-- Chat messages
+L["FlightTimeAdded"] = "Flugzeit hinzugefügt:"
+L["FlightTimeUpdated"] = "Flugzeit aktualisiert:"
+L["FlightTimeContribute"] = "Es stehen %s Flugzeiten zur Verfügung, die zur Verbesserung des Addons beitragen könnten. Gib \"/inflight export\" ein, um sie zu teilen."
+
+-- Export window
+L["ExportMessage"] = "Danke, dass du deine neu entdeckten Flugrouten teilen möchtest!\nBitte kopiere den unten stehenden Text in die Zwischenablage (STRG-C) und poste ihn auf einer der folgenden Websites:"
+L["Select All"] = "Alles auswählen"
+L["Dismiss"] = "Schließen"
+
+-- Parsing
+L["DestParse"] = ", .+"
+
+-- Flight points and gossip options, looked up by name while in flight
 L["Amber Ledge"] = "Bernsteinflöz"
 L["AmberLedgeGossip"] = "Ich möchte Durchgang zum Transitusschild"
 L["Argent Tournament Grounds"] = "Argentumturnierplatz"

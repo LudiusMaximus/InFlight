@@ -1,49 +1,61 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("InFlight", "ptBR")
 if not L then return end
 
-L["ExportMessage"] = "Obrigado por compartilhar suas novas rotas de voo descobertas!\nPor favor, copie o texto abaixo para a área de transferência (CTRL-C) e poste-o em um dos seguintes sites:"
-L["Dismiss"] = "Fechar"
-L["Select All"] = "Selecionar Tudo"
-
-L["AddonDisabled"] = "Versão incorreta do cliente detectada: desativando o complemento"
-L["BackgroundColor"] = "Cor de Fundo"
-L["BarColor"] = "Cor da Barra"
-L["BarOptions"] = "Opções de Bar"
-L["Border"] = "Borda"
-L["BorderColor"] = "Cor da Borda"
-L["CompactMode"] = "Modo Compacto"
-L["ConfirmFlight"] = "Confirmar Vôo"
-L["ConfirmPopup"] = "Tome o vôo para %s?"
-L["CountUp"] = "Contagem"
-L["DefaultsUpdated"] = "Dados padrão atualizados."
-L["DestParse"] = ", .+"
-L["Duration"] = "Duração: "
-L["Enter your 'to' text."] = "Insira o texto 'para'."
-L["ExportFlightTimes"] = "Exportar tempos de voo"
-L["FillUp"] = "Encher"
-L["FlightTimeAdded"] = "tempo de vôo acrescentou:"
-L["FlightTimeContribute"] = "%s tempos de voo disponíveis para contribuir. Digite \"/inflight export\" para compartilhar."
-L["FlightTimeUpdated"] = "tempo de vôo atualização:"
-L["Font"] = "Fonte"
-L["FontColor"] = "Cor da Fonte"
-L["Height"] = "Altura"
-L["OutlineInfo"] = "Delinear as Informações"
-L["OutlineTime"] = "Delinear o Tempo"
-L["PerCharOptions"] = "Opções Específicas de Caracteres"
-L["ResetFlightTimes"] = "Redefinir o vôo Tempos"
-L["ResetOptions"] = "Redefinir as Opções"
-L["ShowChat"] = "Mensagens de Chat"
-L["ShowSpark"] = "Mostrar Faísca"
-L["TextOptions"] = "Opções de Texto"
-L["Texture"] = "Textura"
+-- Mouseover on the bar itself
 L["TooltipOption1"] = "<Shift Clique-Esquerdo> para mover"
 L["TooltipOption2"] = "<Clique-Direito> para Opções"
 L["TooltipOption3"] = "<Ctrl Clique-Esquerda> para forçar perto"
-L["ToText"] = "\"Para\" Texto"
-L["TwoLines"] = "Texto em duas linhas"
-L["UnknownColor"] = "Cor Desconhecida"
-L["Width"] = "Largura"
+L["Duration"] = "Duração: "
 
+-- Settings menu: what a change applies to
+L["PerCharOptions"] = "Opções Específicas de Caracteres"
+
+-- Settings menu: Bar Settings
+L["BarOptions"] = "Opções de Bar"
+L["Height"] = "Altura"
+L["Width"] = "Largura"
+L["Texture"] = "Textura"
+L["Border"] = "Borda"
+L["BarColor"] = "Cor da Barra"
+L["UnknownColor"] = "Cor Desconhecida"
+L["BackgroundColor"] = "Cor de Fundo"
+L["BorderColor"] = "Cor da Borda"
+L["CountUp"] = "Contagem"
+L["FillUp"] = "Encher"
+L["ShowSpark"] = "Mostrar Faísca"
+
+-- Settings menu: Text Settings
+L["TextOptions"] = "Opções de Texto"
+L["Font"] = "Fonte"
+L["FontColor"] = "Cor da Fonte"
+L["OutlineInfo"] = "Delinear as Informações"
+L["OutlineTime"] = "Delinear o Tempo"
+L["CompactMode"] = "Modo Compacto"
+L["TwoLines"] = "Texto em duas linhas"
+L["ToText"] = "\"Para\" Texto"
+L["Enter your 'to' text."] = "Insira o texto 'para'."
+
+-- Settings menu: Other
+L["ShowChat"] = "Mensagens de Chat"
+L["ConfirmFlight"] = "Confirmar Vôo"
+L["ConfirmPopup"] = "Tome o vôo para %s?"
+L["ResetFlightTimes"] = "Redefinir o vôo Tempos"
+L["ExportFlightTimes"] = "Exportar tempos de voo"
+
+-- Chat messages
+L["FlightTimeAdded"] = "tempo de vôo acrescentou:"
+L["FlightTimeUpdated"] = "tempo de vôo atualização:"
+L["FlightTimeContribute"] = "%s tempos de voo disponíveis para contribuir. Digite \"/inflight export\" para compartilhar."
+
+-- Export window
+L["ExportMessage"] = "Obrigado por compartilhar suas novas rotas de voo descobertas!\nPor favor, copie o texto abaixo para a área de transferência (CTRL-C) e poste-o em um dos seguintes sites:"
+L["Select All"] = "Selecionar Tudo"
+L["Dismiss"] = "Fechar"
+
+-- Parsing
+L["DestParse"] = ", .+"
+
+-- Flight points and gossip options, looked up by name while in flight
 L["Amber Ledge"] = "Promontório Âmbar"
 L["AmberLedgeGossip"] = "Eu quero ser levado ao Escudo de Transitus"
 L["Argent Tournament Grounds"] = "Campos do Torneio Argênteo"

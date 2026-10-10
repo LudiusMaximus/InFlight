@@ -36,11 +36,13 @@ InFlight.debug = false
 -- LOCAL VARIABLES
 local debug = InFlight.debug
 local Print, PrintD = InFlight.Print, InFlight.PrintD
-local profile
+local profile  -- the user's own settings, written only by the settings menu
+local look     -- what the bar is drawn from, see below
 local taxiSrc, taxiSrcName, taxiDst, taxiDstName, endTime  -- location data
 local porttaken, takeoff, inworld, outworld, ontaxi        -- flags
 local ratio, endText = 0, "??"                             -- cache variables
 local sb, spark, timeText, locText, bord                   -- frame elements
+local previewActive                                        -- edit mode dummy flight
 local totalTime, startTime, elapsed, throt = 0, 0, 0, 0    -- throttle variables
 local oldTakeTaxiNode
 
@@ -220,8 +222,157 @@ end
 local function SetToUnknown()  -- setup bar for flights with unknown time
   sb:SetMinMaxValues(0, 1)
   sb:SetValue(1)
-  sb:SetStatusBarColor(profile.unknowncolor.r, profile.unknowncolor.g, profile.unknowncolor.b, profile.unknowncolor.a)
+  sb:SetStatusBarColor(look.unknowncolor.r, look.unknowncolor.g, look.unknowncolor.b, look.unknowncolor.a)
   spark:Hide()
+end
+
+-- The client loads a font file on demand. The first SetFont for a file returns
+-- false and leaves the string on the font it had, and the load only completes on
+-- a later frame, so the call has to be repeated. The load lasts for the session,
+-- which is why a font only ever misbehaves the first time it is used after a
+-- client start and never again after a reload. There is no API to load a font up
+-- front, and every size and outline combination becomes available together once
+-- the file is in, so there is nothing to avoid, only to wait for.
+--
+-- The catch is that the pending load is only picked up when the string is laid
+-- out again. Repeating SetFont on a string that is otherwise left alone gets
+-- false forever, no matter how long it is left. That is why changing any other
+-- bar setting, which re-anchors these strings and rewrites their text, was what
+-- used to make a newly picked font appear.
+--
+-- So: ask again, and make the string lay itself out between attempts. Dropping
+-- the outline is kept as a cheap safety net, since the right font without one
+-- would still beat the wrong font with one.
+local fontRetryDelays = { 0.1, 0.25, 0.5, 1, 2, 4, 8 }
+local fontRetryToken = 0
+
+-- Returns true once the string carries the configured font, outline or not.
+local function ApplyFontTo(fontString, fontPath, size, flags)
+  if fontPath and fontString:SetFont(fontPath, size, flags) then
+    return true
+  end
+
+  -- Not every font takes an outline at every size. The right font without one
+  -- beats keeping whatever font happened to be there before.
+  if fontPath and flags ~= "" and fontString:SetFont(fontPath, size, "") then
+    return true
+  end
+
+  -- A string that never got a font at all throws on the next SetText.
+  if not fontString:GetFont() then
+    fontString:SetFont(STANDARD_TEXT_FONT or GameFontNormal:GetFont(), size, flags)
+  end
+
+  -- The pending load is only picked up once the string is laid out again, so give
+  -- it a reason to be. Asking again without this never comes good, however long
+  -- it is left, which is why changing some other bar setting by hand was what used
+  -- to fix it.
+  local text = fontString:GetText() or ""
+  fontString:SetText(text .. " ")
+  fontString:SetText(text)
+
+  return false
+end
+
+-- Returns true once both strings carry the configured font.
+local function ApplyBarFonts()
+  -- Fetch hands back the default, or a global override, in place of an unknown
+  -- key, and nil only when there is no media table at all. So a wrong key gives a
+  -- plausible wrong font rather than an error.
+  local fontPath = smed:Fetch("font", look.font)
+
+  -- Both have to run, so do not let "and" short circuit the second one away.
+  local locOk = ApplyFontTo(locText, fontPath, look.fontsize, look.outline and "OUTLINE" or "")
+  local timeOk = ApplyFontTo(timeText, fontPath, look.fontsize, look.outlinetime and "OUTLINE" or "")
+
+  return locOk and timeOk
+end
+
+local function ApplyBarFontsWithRetry()
+  if ApplyBarFonts() then
+    return
+  end
+
+  fontRetryToken = fontRetryToken + 1
+  local token = fontRetryToken
+
+  -- One pending timer at a time, each attempt booking the next, rather than the
+  -- whole chain queued at once: UpdateLook runs on every step of a slider drag,
+  -- and a chain per step would leave hundreds of timers pending for one font.
+  -- The delays are counted from this call, so each wait is the gap to the next.
+  local function Attempt(index)
+    local delay = fontRetryDelays[index]
+    if not delay then
+      return
+    end
+
+    C_Timer.After(delay - (fontRetryDelays[index - 1] or 0), function()
+      -- A newer attempt took over.
+      if token ~= fontRetryToken then
+        return
+      end
+      if not ApplyBarFonts() then
+        Attempt(index + 1)
+      end
+    end)
+  end
+
+  Attempt(1)
+end
+
+-- LibSharedMedia offers the client's Korean and Chinese font files to western
+-- clients as well, on the strength of a glyph coverage check made in 2012. They
+-- no longer earn their place. Measured at size 16 on 12.1.0, "2002 Bold" renders
+-- latin and digits pixel identical to Friz Quadrata, "2002" differs only by a
+-- third of a pixel per digit, and the three AR files share one latin set between
+-- them. Their own scripts do render, but a western client never asks for them.
+--
+-- Other locales keep the full list, because there these files are the point, and
+-- fonts registered by other addons are never touched.
+local redundantWesternFonts = {
+  ["2002"] = true,
+  ["2002 Bold"] = true,
+  ["AR CrystalzcuheiGBK Demibold"] = true,
+  ["AR ZhongkaiGBK Medium"] = true,
+  ["AR ZhongkaiGBK Medium (Combat)"] = true,
+}
+
+local nonWesternLocales = { koKR = true, zhCN = true, zhTW = true, ruRU = true }
+
+-------------------------------
+function InFlight:GetFontList()  -- the fonts worth offering on this client
+-------------------------------
+  local fonts = smed:List("font")
+  if nonWesternLocales[GetLocale()] then
+    return fonts
+  end
+
+  local offered = {}
+  for _, name in ipairs(fonts) do
+    if not redundantWesternFonts[name] then
+      offered[#offered + 1] = name
+    end
+  end
+  return offered
+end
+
+
+-- Sample flight for the edit mode dummy. Two real flight points, picked at the
+-- median length of the 731 names in the defaults, so that the preview shows the
+-- bar carrying about as much text as it usually will.
+local previewTotal, previewDone = 90, 54
+local previewSrcName, previewDstName = "Menethil Harbor", "Nethergarde Keep"
+
+local function SetToPreview()  -- fill the bar with a dummy flight for the edit mode
+  local barcolor = look.barcolor or {r = 0.5, g = 0.5, b = 0.8, a = 1.0}
+  -- The spark rides the filled edge, so it takes the bar's value rather than the
+  -- elapsed time, which are the same thing only when Fill Up is on.
+  local value = look.fill and previewDone or previewTotal - previewDone
+  sb:SetMinMaxValues(0, previewTotal)
+  sb:SetValue(value)
+  sb:SetStatusBarColor(barcolor.r, barcolor.g, barcolor.b, barcolor.a)
+  spark:SetPoint("CENTER", sb, "LEFT", look.width * value / previewTotal, 0)
+  spark:SetShown(look.spark)
 end
 
 local function GetEstimatedTime(slot)  -- estimates flight times based on hops
@@ -342,14 +493,14 @@ function InFlight:SetupInFlight()
         print("Only exporting from the live game client. PTR has been unreliable before.")
       end
     else
-      self:ShowOptions()
+      self:ShowSettings()
     end
 
   end
   SLASH_INFLIGHT1 = "/inflight"
 
 
-  -- Option panel.
+  -- The addon settings panel.
   local panel = CreateFrame("Frame")
     
   local t1 = panel:CreateFontString(nil, "ARTWORK")
@@ -374,7 +525,7 @@ function InFlight:SetupInFlight()
   local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   b:SetText(_G.GAMEOPTIONS_MENU)
   b:SetWidth(max(120, b:GetTextWidth() + 20))
-  b:SetScript("OnClick", InFlight.ShowOptions)
+  b:SetScript("OnClick", InFlight.ShowSettings)
   b:SetPoint("TOPLEFT", t2, "BOTTOMLEFT", -2, -8)
   
   panel.name = "InFlight"
@@ -422,7 +573,10 @@ end
 function InFlight:LoadBulk()
 ----------------------------
 
-  -- SavedVariables
+  -- SavedVariables. Whether there were any is worth knowing before they are
+  -- created, because the conversion below gives even a brand new install a
+  -- Default profile, which then looks exactly like an old one nobody changed.
+  local freshInstall = InFlightDB == nil
   InFlightDB = InFlightDB or {}
 
   -- Convert old saved variables
@@ -567,10 +721,75 @@ function InFlight:LoadBulk()
     self.defaults.global[playerFaction == "Alliance" and "Horde" or "Alliance"] = nil
   end
 
+  -- The "to" text used to default to the long string below. Every place the bar
+  -- draws it already puts spaces around it, so that default carried spaces of its
+  -- own, and the popup capped input at fewer letters than the default itself used.
+  -- It is "->" now, which reads the same in every locale. Anyone who was on the old
+  -- default keeps the old text, written out as their own so that nothing about
+  -- their bar changes.
+  --
+  -- This has to run before AceDB fills the new default in, because an absent value
+  -- can only be read as "was on the old default" until that happens. The flag can
+  -- go, with this whole block, a few versions from now.
+  --
+  -- A fresh install never had the old default, so it gets the new one.
+  if not InFlightDB.totextMigrated then
+    InFlightDB.totextMigrated = true
+    if not freshInstall then
+      for _, savedProfile in pairs(InFlightDB.profiles or {}) do
+        if savedProfile.totext == nil then
+          savedProfile.totext = " >--In Route To--> "
+        end
+      end
+    end
+  end
+
   -- Create self.db SavedVariables InFlightDB with Inflight.defaults as defaults.
   self.db = LibStub("AceDB-3.0"):New("InFlightDB", self.defaults, true)
   -- Map to local variable.
   profile = self.db.profile
+
+  -- What the bar is drawn from: the active edit mode layout's overrides on top,
+  -- falling through to the user's own settings for every key the layout does not
+  -- set. A layout never writes to db.profile, so the profile always holds what
+  -- the user chose, whatever a layout happens to be painting over it.
+  --
+  -- Everything that draws the bar reads look. Everything in the settings menu
+  -- reads and writes profile. That is the whole rule, and it is the reason there
+  -- is no shadow copy of the settings to keep in sync.
+  look = setmetatable({}, {__index = function(_, key) return profile[key] end})
+
+  -- Media names that look like a number used to be stored as one, which matches
+  -- no LibSharedMedia entry, so Fetch silently handed back the default instead.
+  -- The font named "2002" was the one this bit.
+  local function RepairMediaKeys(t)
+    if type(t) ~= "table" then
+      return
+    end
+    for _, key in ipairs({"font", "texture", "border"}) do
+      if type(t[key]) == "number" then
+        t[key] = tostring(t[key])
+      end
+    end
+  end
+
+  -- The profile in use, whichever table that turns out to be, and then every
+  -- stored one so that switching profiles does not bring the problem back.
+  RepairMediaKeys(profile)
+  if InFlightDB.profiles then
+    for _, savedProfile in pairs(InFlightDB.profiles) do
+      RepairMediaKeys(savedProfile)
+    end
+  end
+
+  -- Every edit mode layout holds its own copy of these settings and lays them
+  -- over the profile whenever the layout is applied, so repairing only the
+  -- profile would leave the number to come back through the override.
+  if InFlightDB.editModeLayouts then
+    for _, layout in pairs(InFlightDB.editModeLayouts) do
+      RepairMediaKeys(layout.settings)
+    end
+  end
 
 
   oldTakeTaxiNode = TakeTaxiNode
@@ -618,7 +837,7 @@ function InFlight:LoadBulk()
       endText = (endTime and "~" or "")..FormatTime(endTime)
     end
 
-    if profile.confirmflight then  -- confirm flight
+    if look.confirmflight then  -- confirm flight
       StaticPopupDialogs.INFLIGHTCONFIRM = StaticPopupDialogs.INFLIGHTCONFIRM or {
         button1 = OKAY, button2 = CANCEL,
         OnAccept = function(this, data) InFlight:StartTimer(data) end,
@@ -660,6 +879,11 @@ function InFlight:LoadBulk()
     porttaken = bool
     PrintD("|cffff8080LFG Ready|cff208080, porttaken -|r", porttaken)
   end)
+
+  -- Needs self.db, so it cannot happen in SetupInFlight.
+  if self.SetupEditMode then
+    self:SetupEditMode()
+  end
 
   self:Hide()
   self.LoadBulk = nil
@@ -731,6 +955,9 @@ end
 ----------------------------------
 function InFlight:StartTimer(slot)  -- lift off
 ----------------------------------
+  -- A real flight always wins over the edit mode dummy.
+  previewActive = nil
+
   Dismount()
   if CanExitVehicle() == 1 then
     VehicleExit()
@@ -744,8 +971,8 @@ function InFlight:StartTimer(slot)  -- lift off
   -- start the timers and setup statusbar
   if endTime then
     sb:SetMinMaxValues(0, endTime)
-    sb:SetValue(profile.fill and 0 or endTime)
-    spark:SetPoint("CENTER", sb, "LEFT", profile.fill and 0 or profile.width, 0)
+    sb:SetValue(look.fill and 0 or endTime)
+    spark:SetPoint("CENTER", sb, "LEFT", look.fill and 0 or look.width, 0)
   else
     SetToUnknown()
   end
@@ -758,7 +985,7 @@ function InFlight:StartTimer(slot)  -- lift off
   porttaken = nil
   elapsed, totalTime, startTime = 0, 0, GetTime()
   takeoff, inworld = true, true
-  throt = min(0.2, (endTime or 50) / (profile.width or 1))  -- increases updates for short flights
+  throt = min(0.2, (endTime or 50) / (look.width or 1))  -- increases updates for short flights
 
   self:RegisterEvent("LFG_PROPOSAL_DONE")
   self:RegisterEvent("LFG_PROPOSAL_SUCCEEDED")
@@ -788,12 +1015,18 @@ function InFlight:RememberFlight()
   -- and both loops take every key in it for a faction. db.char is simply a scope
   -- that is out of their way. Nothing here relies on it being per character: a
   -- reload cannot change the character, and a logout is not recovered anyway.
+  --
+  -- The expected duration is kept as it was worked out at take off rather than
+  -- worked out again. An estimate from the route's hops needs the flight map open,
+  -- and its text carries the "~" that says it is one.
   self.db.char.inTransit = taxiSrc and {
     src = taxiSrc,
     srcName = taxiSrcName,
     dst = taxiDst,
     dstName = taxiDstName,
     startTime = startTime,
+    endTime = endTime,
+    endText = endText,
     airborne = ontaxi and true or nil,
   } or nil
 end
@@ -829,15 +1062,7 @@ function InFlight:RecoverFlight(isReloadingUi)  -- pick a flight back up after a
 
   taxiSrc, taxiSrcName = saved.src, saved.srcName
   taxiDst, taxiDstName = saved.dst, saved.dstName
-
-  local dstNodes = GetDstNodes(taxiSrc, playerFaction)
-  local flightTime = dstNodes and dstNodes[taxiDst]
-  if flightTime and flightTime > 0 then
-    endTime = flightTime * self:KhazAlgarFlightMasterFactor(taxiDst) * self:RideLikeTheWindFactor()
-  else
-    endTime = nil
-  end
-  endText = FormatTime(endTime)
+  endTime, endText = saved.endTime, saved.endText
 
   if not sb then
     self:CreateBar()
@@ -857,7 +1082,7 @@ function InFlight:RecoverFlight(isReloadingUi)  -- pick a flight back up after a
   porttaken, takeoff = nil, nil
   ontaxi, inworld = true, true
   elapsed, totalTime, startTime = 0, flown, saved.startTime
-  throt = min(0.2, (endTime or 50) / (profile.width or 1))
+  throt = min(0.2, (endTime or 50) / (look.width or 1))
 
   self:RegisterEvent("LFG_PROPOSAL_DONE")
   self:RegisterEvent("LFG_PROPOSAL_SUCCEEDED")
@@ -904,13 +1129,13 @@ do  -- timer bar
   -----------------------------
     sb = CreateFrame("StatusBar", "InFlightBar", UIParent)
     sb:Hide()
-    sb:SetPoint(profile.p, UIParent, profile.rp, profile.x, profile.y)
+    sb:SetPoint(look.p, UIParent, look.rp, look.x, look.y)
     sb:SetMovable(true)
     sb:EnableMouse(true)
     sb:SetClampedToScreen(true)
     sb:SetScript("OnMouseUp", function(this, a1)
       if a1 == "RightButton" then
-        InFlight:ShowOptions()
+        InFlight:ShowSettings()
       elseif a1 == "LeftButton" and IsControlKeyDown() then
         ontaxi, porttaken = nil, true
       end
@@ -924,7 +1149,12 @@ do  -- timer bar
     sb:SetScript("OnDragStop", function(this)
       this:StopMovingOrSizing()
       local a,b,c,d,e = this:GetPoint()
-      profile.p, profile.rp, profile.x, profile.y = a, c, floor(d + 0.5), floor(e + 0.5)
+      -- Meant to stick, just like a change made in the settings menu.
+      InFlight:SetLook("p", a)
+      InFlight:SetLook("rp", c)
+      InFlight:SetLook("x", floor(d + 0.5))
+      InFlight:SetLook("y", floor(e + 0.5))
+      InFlight:CaptureEditModeLayout()
     end)
     sb:SetScript("OnEnter", function(this)
       gtt:SetOwner(this, "ANCHOR_RIGHT")
@@ -1011,12 +1241,12 @@ do  -- timer bar
           local newTime = floor(totalTime + 0.5)
 
 
-          local msg = strjoin(" ", taxiSrcName .. (debug and "(" .. taxiSrc .. ")" or ""), profile.totext, taxiDstName .. (debug and "(" .. taxiDst .. ")" or ""), "|cff208080")
+          local msg = strjoin(" ", taxiSrcName .. (debug and "(" .. taxiSrc .. ")" or ""), look.totext, taxiDstName .. (debug and "(" .. taxiDst .. ")" or ""), "|cff208080")
           if not oldTime then
             msg = msg .. L["FlightTimeAdded"] .. "|r " .. FormatTime(newTime)
 
           elseif abs(newTime - oldTime) > 2 then
-            msg = msg .. L["FlightTimeUpdated"] .. "|r " .. FormatTime(oldTime) .. " |cff208080" .. profile.totext .. "|r " .. FormatTime(newTime)
+            msg = msg .. L["FlightTimeUpdated"] .. "|r " .. FormatTime(oldTime) .. " |cff208080" .. look.totext .. "|r " .. FormatTime(newTime)
 
           else
             newTime = oldTime
@@ -1036,7 +1266,7 @@ do  -- timer bar
           InFlight.db.global[faction][taxiSrc][taxiDst] = newBaseTime
 
 
-          if msg and profile.chatlog then
+          if msg and look.chatlog then
             Print(msg)
           end
         end
@@ -1067,11 +1297,11 @@ do  -- timer bar
             curTime = 0
           end
 
-          local value = profile.fill and curTime or (endTime - curTime)
+          local value = look.fill and curTime or (endTime - curTime)
           sb:SetValue(value)
           spark:SetPoint("CENTER", sb, "LEFT", value * ratio, 0)
 
-          value = profile.countup and curTime or (endTime - curTime)
+          value = look.countup and curTime or (endTime - curTime)
           timeText:SetFormattedText("%s / %s", FormatTime(value), endText)
         end
       else  -- destination time is unknown, so show that it's timing
@@ -1100,6 +1330,9 @@ do  -- timer bar
       inworld = true
       if outworld then
         startTime = startTime - (outworld - GetTime())
+        -- The stored flight has to follow, or a reload later in the same flight
+        -- would measure from before the loading screen and count it as flying.
+        self:RememberFlight()
       end
 
       outworld = nil
@@ -1134,15 +1367,15 @@ do  -- timer bar
       return
     end
 
-    sb:SetWidth(profile.width)
-    sb:SetHeight(profile.height)
+    sb:SetWidth(look.width)
+    sb:SetHeight(look.height)
 
-    local texture = smed:Fetch("statusbar", profile.texture)
-    local borderTexture = smed:Fetch("border", profile.border)
-    local inset = (profile.border=="Textured" and 2) or 4
+    local texture = smed:Fetch("statusbar", look.texture)
+    local borderTexture = smed:Fetch("border", look.border)
+    local inset = (look.border=="Textured" and 2) or 4
     
-    local backcolor = profile.backcolor or {r=0.1, g=0.1, b=0.1, a=0.6}
-    local bordercolor = profile.bordercolor or {r=0.6, g=0.6, b=0.6, a=0.8}
+    local backcolor = look.backcolor or {r=0.1, g=0.1, b=0.1, a=0.6}
+    local bordercolor = look.bordercolor or {r=0.6, g=0.6, b=0.6, a=0.8}
     
     
     -- Create fresh backdrop table to ensure proper SetBackdrop behavior
@@ -1163,12 +1396,14 @@ do  -- timer bar
       sb:GetStatusBarTexture():SetVertTile(false)
     end
 
-    spark:SetHeight(profile.height * 2.4)
-    if endTime then  -- in case we're in flight
-      ratio = profile.width / endTime
-      local barcolor = profile.barcolor or {r=0.5, g=0.5, b=0.8, a=1.0}
+    spark:SetHeight(look.height * 2.4)
+    if previewActive then
+      SetToPreview()
+    elseif endTime then  -- in case we're in flight
+      ratio = look.width / endTime
+      local barcolor = look.barcolor or {r=0.5, g=0.5, b=0.8, a=1.0}
       sb:SetStatusBarColor(barcolor.r or 0.5, barcolor.g or 0.5, barcolor.b or 0.8, barcolor.a or 1.0)
-      if profile.spark then
+      if look.spark then
         spark:Show()
       else
         spark:Hide()
@@ -1177,42 +1412,201 @@ do  -- timer bar
       SetToUnknown()
     end
 
-    local fontcolor = profile.fontcolor or {r=1.0, g=1.0, b=1.0, a=1.0}
-    locText:SetFont(smed:Fetch("font", profile.font), profile.fontsize, profile.outline and "OUTLINE" or nil)
+    local fontcolor = look.fontcolor or {r=1.0, g=1.0, b=1.0, a=1.0}
+
+    ApplyBarFontsWithRetry()
+
     locText:SetShadowColor(0, 0, 0, fontcolor.a or 1.0)
     locText:SetShadowOffset(1, -1)
     locText:SetTextColor(fontcolor.r or 1.0, fontcolor.g or 1.0, fontcolor.b or 1.0, fontcolor.a or 1.0)
 
-    timeText:SetFont(smed:Fetch("font", profile.font), profile.fontsize, profile.outlinetime and "OUTLINE" or nil)
     timeText:SetShadowColor(0, 0, 0, fontcolor.a or 1.0)
     timeText:SetShadowOffset(1, -1)
     timeText:SetTextColor(fontcolor.r or 1.0, fontcolor.g or 1.0, fontcolor.b or 1.0, fontcolor.a or 1.0)
 
-    if profile.inline then
+    -- The edit mode dummy shows names of its own rather than writing them into
+    -- the flight's variables, which a flight master opened during edit mode would
+    -- then fill in for real and closing edit mode would wipe out again.
+    local srcName = previewActive and previewSrcName or taxiSrcName or "??"
+    local dstName = previewActive and previewDstName or taxiDstName or "??"
+
+    if look.inline then
       timeText:SetJustifyH("RIGHT")
       timeText:SetJustifyV("MIDDLE")
       SetPoints(timeText, "RIGHT", sb, "RIGHT", -4, 0)
       locText:SetJustifyH("LEFT")
       locText:SetJustifyV("MIDDLE")
       SetPoints(locText, "LEFT", sb, "LEFT", 4, 0, "RIGHT", timeText, "LEFT", -2, 0)
-      locText:SetText(taxiDstName or "??")
-    elseif profile.twolines then
+      locText:SetText(dstName)
+    elseif look.twolines then
       timeText:SetJustifyH("CENTER")
       timeText:SetJustifyV("MIDDLE")
       SetPoints(timeText, "CENTER", sb, "CENTER", 0, 0)
       locText:SetJustifyH("CENTER")
       locText:SetJustifyV("BOTTOM")
-      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, profile.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, (profile.border=="None" and 1) or 3)
-      locText:SetFormattedText("%s %s\n%s", taxiSrcName or "??", profile.totext, taxiDstName or "??")
+      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, look.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, (look.border=="None" and 1) or 3)
+      locText:SetFormattedText("%s %s\n%s", srcName, look.totext, dstName)
     else
       timeText:SetJustifyH("CENTER")
       timeText:SetJustifyV("MIDDLE")
       SetPoints(timeText, "CENTER", sb, "CENTER", 0, 0)
       locText:SetJustifyH("CENTER")
       locText:SetJustifyV("BOTTOM")
-      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, profile.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, (profile.border=="None" and 1) or 3)
-      locText:SetFormattedText("%s %s %s", taxiSrcName or "??", profile.totext, taxiDstName or "??")
+      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, look.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, (look.border=="None" and 1) or 3)
+      locText:SetFormattedText("%s %s %s", srcName, look.totext, dstName)
     end
+
+    -- Down here, because the time text has no font until this function sets one,
+    -- which is why nothing else writes text before that point either.
+    if previewActive then
+      timeText:SetFormattedText("%1$s / %2$s",
+        FormatTime(look.countup and previewDone or previewTotal - previewDone), FormatTime(previewTotal))
+    end
+  end
+
+  ---------------------------
+  function InFlight:GetBar()  -- the timer bar, created on first use
+  ---------------------------
+    if not sb then
+      self:CreateBar()
+    end
+    return sb
+  end
+
+  -------------------------------------
+  function InFlight:ApplyBarPosition()
+  -------------------------------------
+    if not sb then
+      return
+    end
+    sb:ClearAllPoints()
+    sb:SetPoint(look.p, UIParent, look.rp, look.x, look.y)
+  end
+
+  --------------------------------------------------
+  function InFlight:SetEditModePreview(shown)  -- dummy flight while the edit mode is open
+  --------------------------------------------------
+    if shown then
+      if previewActive or takeoff or ontaxi then
+        return
+      end
+      self:GetBar()
+      previewActive = true
+      self:UpdateLook()
+      sb:Show()
+
+    elseif previewActive then
+      previewActive = nil
+      sb:Hide()
+    end
+  end
+end
+
+
+-- Profiles, for the parts of the addon that have to compare or copy them
+--------------------------------------------------------------------------------
+
+-- Compares two stored profiles setting by setting. AceDB strips default valued
+-- keys out of every profile that is not the current one, so comparing the two
+-- tables outright would report a difference for every setting neither of them
+-- has ever touched. Both sides fall back to the default instead.
+local function ProfilesDiffer(mine, theirs, defaults, skip)
+  for key, default in pairs(defaults) do
+    if not (skip and skip[key]) then
+      local mineValue = mine and mine[key]
+      local theirValue = theirs and theirs[key]
+      if mineValue == nil then mineValue = default end
+      if theirValue == nil then theirValue = default end
+
+      if type(mineValue) == "table" and type(theirValue) == "table" then
+        if ProfilesDiffer(mineValue, theirValue, default) then
+          return true
+        end
+      elseif mineValue ~= theirValue then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+-- perchar says which profile is in use rather than how the bar looks, so it is
+-- never what makes two profiles differ.
+local profileCompareSkip = { perchar = true }
+
+
+----------------------------------------------------------
+function InFlight:ProfileDiffersFromAccountWide(profileName)
+----------------------------------------------------------
+  local stored = self.db.profiles
+  if not stored or not stored[profileName] then
+    return false
+  end
+  return ProfilesDiffer(stored[profileName], stored["Default"],
+    self.defaults.profile, profileCompareSkip)
+end
+
+
+-----------------------------------------
+function InFlight:GetCopyableProfiles()
+-----------------------------------------
+  -- The account wide settings always, because every character has them, and then
+  -- any character's own settings that actually say something different. A profile
+  -- identical to the account wide one would be an entry that copies nothing.
+  local found = { { name = "Default", accountWide = true } }
+
+  for _, name in ipairs(self.db:GetProfiles()) do
+    if name ~= "Default" and self:ProfileDiffersFromAccountWide(name) then
+      found[#found + 1] = { name = name }
+    end
+  end
+
+  return found
+end
+
+
+-- The look table, reached from outside this file
+--------------------------------------------------------------------------------
+-- The bar is drawn from look, which is the active layout's overrides falling
+-- through to profile. These are the only ways in, so that the two tables cannot
+-- be confused for one another anywhere else.
+
+------------------------------
+function InFlight:GetLook(key)  -- the value the bar is currently drawn with
+------------------------------
+  return look[key]
+end
+
+
+---------------------------------------------
+function InFlight:SetLookOverride(key, value)  -- a layout's own value for this key
+---------------------------------------------
+  look[key] = value
+end
+
+
+---------------------------------------
+function InFlight:ClearLookOverrides()  -- back to the user's own settings
+---------------------------------------
+  wipe(look)
+  self:ApplyBarPosition()
+  self:UpdateLook()
+end
+
+
+---------------------------------------
+function InFlight:SetLook(key, value)  -- a setting changed outside the layout editor
+---------------------------------------
+  -- Where the change lands is what the "Layout Specific Settings" checkbox
+  -- decides: the layout that owns the bar, or the user's own settings. A change
+  -- never goes to both, so nothing is rewritten behind the user's back.
+  if self:IsLayoutSpecific() then
+    look[key] = type(value) == "table" and CopyTable(value) or value
+  else
+    profile[key] = value
+    -- No layout owns the bar, so no override should be masking this. Cleared
+    -- rather than assumed, so the invariant holds either way.
+    look[key] = nil
   end
 end
 
@@ -1220,23 +1614,101 @@ end
 -- Register dummy border for styling (allows "Textured" border option without an actual texture file)
 smed:Register("border", "Textured", "\\Interface\\None")
 
+-- One tooltip per setting, keyed the way the settings themselves are, so that the
+-- settings menu and the layout editor cannot end up describing the same setting
+-- differently. Entries that are not settings are looked up by name where they
+-- are created.
+InFlight.tooltips = {
+  countup      = L["CountUpTooltip"],
+  fill         = L["FillUpTooltip"],
+  spark        = L["ShowSparkTooltip"],
+  height       = L["HeightTooltip"],
+  width        = L["WidthTooltip"],
+  texture      = L["TextureTooltip"],
+  border       = L["BorderTooltip"],
+  bordercolor  = L["BorderColorTooltip"],
+  backcolor    = L["BackgroundColorTooltip"],
+  barcolor     = L["BarColorTooltip"],
+  unknowncolor = L["UnknownColorTooltip"],
+
+  inline       = L["CompactModeTooltip"],
+  twolines     = L["TwoLinesTooltip"],
+  totext       = L["ToTextTooltip"],
+  font         = L["FontTooltip"],
+  fontsize     = L["FontSizeTooltip"],
+  fontcolor    = L["FontColorTooltip"],
+  outline      = L["OutlineInfoTooltip"],
+  outlinetime  = L["OutlineTimeTooltip"],
+
+  chatlog       = L["ShowChatTooltip"],
+  confirmflight = L["ConfirmFlightTooltip"],
+}
+
+
 -------------------------------
-function InFlight.ShowOptions()
+function InFlight.ShowSettings()
 -------------------------------
+  -- Helper: Redraw the bar and let the edit mode layout, if one owns the bar,
+  -- take the change on board. Everything in this menu is meant to stick.
+  local function UpdateLook()
+    InFlight:UpdateLook()
+    InFlight:CaptureEditModeLayout()
+  end
+
+  -- Helper: Read the value this menu is editing. Layout specific or not, that is
+  -- the value the bar is wearing, so the menu and the bar always agree.
+  local function Get(key)
+    return InFlight:GetLook(key)
+  end
+
+  -- Helper: Change one setting and show the result
+  local function Set(key, value)
+    InFlight:SetLook(key, value)
+    UpdateLook()
+  end
+
+  -- Helper: Flip one of the user's own boolean settings
+  local function Toggle(key)
+    Set(key, not Get(key))
+  end
+
+  local tips = InFlight.tooltips
+
+  -- Helper: A checkbox for one setting, carrying the same tooltip the layout
+  -- editor shows for it
+  local function AddCheckbox(menu, label, key)
+    local entry = menu:CreateCheckbox(label,
+      function() return Get(key) end,
+      function() Toggle(key) end)
+
+    if tips[key] then
+      entry:SetTitleAndTextTooltip(label, tips[key])
+    end
+    return entry
+  end
+
+  -- Helper: The profile itself was swapped or wiped, rather than one setting in
+  -- it changing. The layout's overrides are untouched by that, so there is
+  -- nothing to capture, only a redraw against whatever the profile now holds.
+  local function ProfileChanged()
+    profile = InFlight.db.profile
+    InFlight:ApplyBarPosition()
+    InFlight:UpdateLook()
+  end
+
   -- Helper: Open dialog to edit the "to" text separator
   local function ShowToTextDialog()
     StaticPopupDialogs["InFlightToText"] = StaticPopupDialogs["InFlightToText"] or {
       text = L["Enter your 'to' text."],
       button1 = ACCEPT, button2 = CANCEL,
-      hasEditBox = 1, maxLetters = 12,
+      hasEditBox = 1, maxLetters = 24,
       OnAccept = function(self)
         local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
-        profile.totext = strtrim(editBox:GetText())
-        InFlight:UpdateLook()
+        Set("totext", editBox:GetText())
       end,
       OnShow = function(self)
         local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
-        editBox:SetText(profile.totext)
+        editBox:SetText(Get("totext"))
         editBox:SetFocus()
       end,
       OnHide = function(self)
@@ -1246,9 +1718,10 @@ function InFlight.ShowOptions()
       EditBoxOnEnterPressed = function(self)
         local parent = self:GetParent()
         local editBox = parent.editBox or _G[parent:GetName() .. "EditBox"]
-        profile.totext = strtrim(editBox:GetText())
+        -- Read before the hide, whose OnHide empties the box.
+        local text = editBox:GetText()
         parent:Hide()
-        InFlight:UpdateLook()
+        Set("totext", text)
       end,
       EditBoxOnEscapePressed = function(self)
         self:GetParent():Hide()
@@ -1258,13 +1731,21 @@ function InFlight.ShowOptions()
     StaticPopup_Show("InFlightToText")
   end
 
-  -- Helper: Reset all options to defaults
-  local function ResetOptions()
+  -- Helper: Reset all settings to defaults
+  local function ResetToDefaults()
+    -- Resets whatever this menu is currently editing: the active layout's own
+    -- settings, or the user's own, which are account wide or character specific
+    -- depending on the other checkbox.
+    if InFlight:IsLayoutSpecific() then
+      InFlight:ResetLayoutToDefaults()
+      return
+    end
+
     InFlight.db:ResetProfile()
     if InFlight.db:GetCurrentProfile() ~= "Default" then
       profile.perchar = true
     end
-    InFlight:UpdateLook()
+    ProfileChanged()
   end
 
   -- Helper: Clear flight time database and reload UI
@@ -1272,6 +1753,14 @@ function InFlight.ShowOptions()
     InFlightDB.dbinit = nil
     InFlightDB.global = {}
     ReloadUI()
+  end
+
+  -- Helper: whether this player has recorded anything the addon does not
+  -- already ship. newPlayerSaveData is filled at load from everything in the
+  -- saved variables that differs from the shipped defaults, and grows again as
+  -- flights are timed, so this answers for the session as it goes.
+  local function HasNewFlightData()
+    return next(InFlight.newPlayerSaveData) ~= nil
   end
 
   -- Helper: Export flight time data to developers
@@ -1283,20 +1772,63 @@ function InFlight.ShowOptions()
     end
   end
 
-  -- Helper: Toggle per-character profile setting
+  -- Helper: Give this character's own profile up, keeping its settings for
+  -- everyone or throwing them away
+  local function DropCharProfile(charKey, keepSettings)
+    InFlight.db:SetProfile("Default")
+    if keepSettings then
+      -- CopyProfile resets the destination before it deep copies, so nothing of
+      -- the old account wide settings is left behind.
+      InFlight.db:CopyProfile(charKey)
+    end
+    profile = InFlight.db.profile
+    profile.perchar = false
+
+    for _, name in ipairs(InFlight.db:GetProfiles()) do
+      if name == charKey then
+        InFlight.db:DeleteProfile(charKey)
+        break
+      end
+    end
+    ProfileChanged()
+  end
+
+  -- Helper: Ask before one set of settings is lost for the other
+  local function ShowPerCharDialog(charKey)
+    -- Shaped like Blizzard's own GAME_SETTINGS_APPLY_DEFAULTS: two opposed
+    -- actions with Cancel between them. Escape calls OnCancel directly, so Cancel
+    -- is the button whose handler does nothing.
+    --
+    -- Callbacks by index rather than the old OnAlt for the third button, which
+    -- Blizzard keeps only "temporarily for backward compatibility" and would
+    -- leave Keep Account Wide doing nothing the day it goes.
+    StaticPopupDialogs["InFlightPerChar"] = StaticPopupDialogs["InFlightPerChar"] or {
+      text = L["PerCharDiscardPrompt"],
+      button1 = L["Discard"],
+      button2 = CANCEL,
+      button3 = L["KeepForAllCharacters"],
+      selectCallbackByIndex = true,
+      OnAccept = function(_, data) DropCharProfile(data, false) end,
+      OnCancel = function() end,
+      OnButton3 = function(_, data) DropCharProfile(data, true) end,
+      timeout = 0, exclusive = 1, whileDead = 1, hideOnEscape = 1,
+    }
+    StaticPopup_Show("InFlightPerChar", nil, nil, charKey)
+  end
+
+  -- Helper: Toggle per-character profile setting. Returns the menu's response.
   local function TogglePerCharProfile()
     local charKey = UnitName("player") .. " - " .. GetRealmName()
     if profile.perchar then
-      -- Disabling: switch back to Default and delete the char profile
-      InFlight.db:SetProfile("Default")
-      profile = InFlight.db.profile
-      profile.perchar = false
-      local existingProfiles = InFlight.db:GetProfiles()
-      for _, name in ipairs(existingProfiles) do
-        if name == charKey then
-          InFlight.db:DeleteProfile(charKey)
-          break
-        end
+      -- Disabling: the character's own settings are about to go, so ask what
+      -- should become of them first, unless there is nothing to lose.
+      if InFlight:ProfileDiffersFromAccountWide(charKey) then
+        ShowPerCharDialog(charKey)
+        -- The question is the popup's now, and the menu behind it would only
+        -- show the box still ticked while it waits for an answer.
+        return MenuResponse.CloseAll
+      else
+        DropCharProfile(charKey, false)
       end
     else
       -- Enabling: copy current Default settings into char profile, then switch to it
@@ -1304,32 +1836,29 @@ function InFlight.ShowOptions()
       InFlight.db:CopyProfile("Default")
       profile = InFlight.db.profile
       profile.perchar = true
+      ProfileChanged()
     end
-    InFlight:UpdateLook()
-  end
-
-  -- Helper: Update numeric/string profile values
-  local function SetSelect(optionKey, value)
-    profile[optionKey] = tonumber(value) or value
-    InFlight:UpdateLook()
   end
 
   -- Helper: Update color values with validation and clamping
   local function SetColor(colorKey, red, green, blue, alpha)
-    local colorTable = profile[colorKey]
-    if not colorTable then return end
-    
-    -- Clamp all RGBA values to valid 0-1 range, using current values as fallback
-    colorTable.r = math.max(0, math.min(1, tonumber(red) or colorTable.r))
-    colorTable.g = math.max(0, math.min(1, tonumber(green) or colorTable.g))
-    colorTable.b = math.max(0, math.min(1, tonumber(blue) or colorTable.b))
-    colorTable.a = math.max(0, math.min(1, tonumber(alpha) or colorTable.a))
-    InFlight:UpdateLook()
+    local current = Get(colorKey)
+    if not current then return end
+
+    -- Clamped to 0-1, falling back to the current value for anything unreadable,
+    -- and built as a fresh table rather than edited in place, because the old one
+    -- may also be what a layout is holding as its override for this key.
+    Set(colorKey, {
+      r = math.max(0, math.min(1, tonumber(red) or current.r)),
+      g = math.max(0, math.min(1, tonumber(green) or current.g)),
+      b = math.max(0, math.min(1, tonumber(blue) or current.b)),
+      a = math.max(0, math.min(1, tonumber(alpha) or current.a)),
+    })
   end
 
   -- Helper: Open color picker for a given color type
   local function OpenColorPicker(colorKey)
-    local colorTable = profile[colorKey]
+    local colorTable = Get(colorKey)
     if not colorTable then return end
     
     local colorInfo = {
@@ -1354,10 +1883,33 @@ function InFlight.ShowOptions()
     ColorPickerFrame:SetupColorPickerAndShow(colorInfo)
   end
 
+  -- Helper: A color swatch for one setting, carrying the same tooltip the layout
+  -- editor shows for it
+  local function AddColorSwatch(menu, label, key)
+    local color = Get(key)
+    local entry = menu:CreateColorSwatch(label,
+      function() OpenColorPicker(key) end,
+      {r = color.r, g = color.g, b = color.b})
+
+    if tips[key] then
+      entry:SetTitleAndTextTooltip(label, tips[key])
+    end
+    return entry
+  end
+
   -- Helper: Create slider submenu with pagination for large ranges
   local function AddFakeSliderSubmenu(parentMenu, sliderLabel, profileKey, minValue, maxValue, stepSize, itemTable)
     local sliderButton = parentMenu:CreateButton(sliderLabel)
-    sliderButton:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+
+    -- Tooltip first, submenu hooked on after it. SetTitleAndTextTooltip installs
+    -- an OnEnter of its own and SetOnEnter replaces rather than adds, so the
+    -- other way round the tooltip quietly threw the force-open away: the tooltip
+    -- appeared at once and the submenu was left waiting out the hover delay,
+    -- unlike the top level ones, which carry no tooltip to lose it to.
+    if tips[profileKey] then
+      sliderButton:SetTitleAndTextTooltip(sliderLabel, tips[profileKey])
+    end
+    sliderButton:HookOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
 
     local itemsPerPage = 20
 
@@ -1370,8 +1922,8 @@ function InFlight.ShowOptions()
         for i = minValue, maxValue, stepSize do
           local itemName = itemTable[i]
           sliderButton:CreateRadio(itemName, 
-            function() return profile[profileKey] == itemName end, 
-            function() SetSelect(profileKey, itemName); return MenuResponse.Refresh end)
+            function() return Get(profileKey) == itemName end, 
+            function() Set(profileKey, itemName); return MenuResponse.Refresh end)
         end
       else
         -- Paginate into submenus if more than 20 items
@@ -1387,8 +1939,8 @@ function InFlight.ShowOptions()
           for i = rangeStart, rangeEnd, stepSize do
             local itemName = itemTable[i]
             rangeMenu:CreateRadio(itemName, 
-              function() return profile[profileKey] == itemName end, 
-              function() SetSelect(profileKey, itemName); return MenuResponse.Refresh end)
+              function() return Get(profileKey) == itemName end, 
+              function() Set(profileKey, itemName); return MenuResponse.Refresh end)
           end
           
           if rangeEnd >= maxValue then
@@ -1420,8 +1972,8 @@ function InFlight.ShowOptions()
         for currentValue = rangeStart, rangeEnd, stepSize do
           local value = currentValue  -- Capture in closure to avoid variable capture issues
           rangeMenu:CreateRadio(format(numberFormat, value), 
-            function() return floor(100 * (profile[profileKey] or 0)) == floor(100 * value) end, 
-            function() SetSelect(profileKey, value); return MenuResponse.Refresh end)
+            function() return floor(100 * (Get(profileKey) or 0)) == floor(100 * value) end, 
+            function() Set(profileKey, value); return MenuResponse.Refresh end)
         end
         
         -- Advance to next range or break if we've reached the end
@@ -1437,18 +1989,65 @@ function InFlight.ShowOptions()
     mainMenu:CreateTitle("|cff0040ffIn|cff00aaffFlight|r")
     mainMenu:CreateDivider()
 
+    -- ===== WHAT IS BEING EDITED =====
+    -- First, because between them these two say what everything below applies
+    -- to: this layout, this character, or every character.
+
+    -- The same state as the InFlight box in the layout editor. Absent where there
+    -- is no layout to give the bar to, an override layout for instance. Greyed
+    -- out on a preset layout, which the layout editor only lets you change by
+    -- saving it as a new layout, so that it cannot end up in a state the layout
+    -- editor itself could never reach.
+    if InFlight:CanBeLayoutSpecific() or InFlight:IsOnPresetLayout() then
+      local layoutSpecific = mainMenu:CreateCheckbox(L["LayoutSpecific"],
+        function() return InFlight:IsLayoutSpecific() end,
+        function() InFlight:SetLayoutSpecific(not InFlight:IsLayoutSpecific()) end)
+      layoutSpecific:SetEnabled(function() return InFlight:CanBeLayoutSpecific() end)
+
+      -- Named rather than described as "the current layout", so that there is no
+      -- doubt which one is about to get its own settings. Read at hover time, so
+      -- that it is still right if the layout changed under an open menu.
+      layoutSpecific:SetTooltip(function(tooltip)
+        GameTooltip_SetTitle(tooltip, L["LayoutSpecific"])
+        GameTooltip_AddNormalLine(tooltip,
+          format(L["LayoutSpecificTooltip"], InFlight:GetLayoutName() or ""), true)
+        if InFlight:IsOnPresetLayout() and not InFlight:CanBeLayoutSpecific() then
+          GameTooltip_AddBlankLineToTooltip(tooltip)
+          GameTooltip_AddErrorLine(tooltip,
+            format(L["LayoutSpecificPreset"], InFlight:GetLayoutName() or ""), true)
+        end
+      end)
+    end
+
+    -- While the layout owns the bar you are editing an entry the layout holds for
+    -- every character, so character specific is not merely inapplicable, it is
+    -- false, and it says so rather than inviting the reading that a change here is
+    -- for this character and this layout both. The real setting is untouched in
+    -- the profile and shows again the moment the layout stops owning the bar.
+    local perChar = mainMenu:CreateCheckbox(L["PerCharOptions"],
+      function() return not InFlight:IsLayoutSpecific() and profile.perchar end,
+      function() return TogglePerCharProfile() end)
+
+    perChar:SetEnabled(function() return not InFlight:IsLayoutSpecific() end)
+    perChar:SetTooltip(function(tooltip)
+      GameTooltip_SetTitle(tooltip, L["PerCharOptions"])
+      -- While the layout owns the bar this box is greyed and says why, which is
+      -- more use than describing a setting that is not in play.
+      GameTooltip_AddNormalLine(tooltip,
+        InFlight:IsLayoutSpecific() and L["PerCharLayoutHint"] or L["PerCharOptionsTooltip"], true)
+    end)
+
+    mainMenu:CreateDivider()
+
     -- ===== BAR OPTIONS =====
     local barMenu = mainMenu:CreateButton(L["BarOptions"])
     barMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
-    
-    barMenu:CreateCheckbox(L["CountUp"], function() return profile.countup end, function() profile.countup = not profile.countup; InFlight:UpdateLook() end)
-    barMenu:CreateCheckbox(L["FillUp"], function() return profile.fill end, function() profile.fill = not profile.fill; InFlight:UpdateLook() end)
-    barMenu:CreateCheckbox(L["ShowSpark"], function() return profile.spark end, function() profile.spark = not profile.spark; InFlight:UpdateLook() end)
-    
-    -- Bar dimensions
+
+    -- Shape first, then what the bar is drawn with, in the order the colours
+    -- below pick those up.
     AddFakeSliderSubmenu(barMenu, L["Height"], "height", 4, 150, 1, nil)
     AddFakeSliderSubmenu(barMenu, L["Width"], "width", 40, 1000, 5, nil)
-    
+
     -- Bar appearance from LibSharedMedia
     local statusbarList = smed:List("statusbar")
     local borderList = smed:List("border")
@@ -1461,84 +2060,100 @@ function InFlight.ShowOptions()
     end
     AddFakeSliderSubmenu(barMenu, L["Texture"], "texture", 1, #statusbarList, 1, statusbarList)
     AddFakeSliderSubmenu(barMenu, L["Border"], "border", 1, #filteredBorderList, 1, filteredBorderList)
-    
+
     barMenu:CreateDivider()
-    
-    -- Bar colors
-    barMenu:CreateColorSwatch(L["BackgroundColor"], function() OpenColorPicker("backcolor") end, 
-      {r = profile.backcolor.r, g = profile.backcolor.g, b = profile.backcolor.b})
-    barMenu:CreateColorSwatch(L["BarColor"], function() OpenColorPicker("barcolor") end, 
-      {r = profile.barcolor.r, g = profile.barcolor.g, b = profile.barcolor.b})
-    barMenu:CreateColorSwatch(L["UnknownColor"], function() OpenColorPicker("unknowncolor") end, 
-      {r = profile.unknowncolor.r, g = profile.unknowncolor.g, b = profile.unknowncolor.b})
-    barMenu:CreateColorSwatch(L["BorderColor"], function() OpenColorPicker("bordercolor") end, 
-      {r = profile.bordercolor.r, g = profile.bordercolor.g, b = profile.bordercolor.b})
-    
+
+    -- The two texture colours, then what shows behind them, then the border. The
+    -- same order the layout editor lays its colour block out in.
+    AddColorSwatch(barMenu, L["BarColor"], "barcolor")
+    AddColorSwatch(barMenu, L["UnknownColor"], "unknowncolor")
+    AddColorSwatch(barMenu, L["BackgroundColor"], "backcolor")
+    AddColorSwatch(barMenu, L["BorderColor"], "bordercolor")
+
+    barMenu:CreateDivider()
+
+    -- How the bar behaves during a flight.
+    AddCheckbox(barMenu, L["CountUp"], "countup")
+    AddCheckbox(barMenu, L["FillUp"], "fill")
+    AddCheckbox(barMenu, L["ShowSpark"], "spark")
+
     -- ===== TEXT OPTIONS =====
     local textMenu = mainMenu:CreateButton(L["TextOptions"])
     textMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
-    
-    textMenu:CreateCheckbox(L["CompactMode"], 
-      function() return profile.inline end, 
-      function() profile.inline = not profile.inline; InFlight:UpdateLook() end)
-    
-    textMenu:CreateCheckbox(L["TwoLines"], 
-      function() return profile.twolines end, 
-      function() profile.twolines = not profile.twolines; InFlight:UpdateLook() end)
-    
-    textMenu:CreateButton(L["ToText"], function() ShowToTextDialog() end)
-    
-    -- Font selection from LibSharedMedia
-    local fontList = smed:List("font")
-    AddFakeSliderSubmenu(textMenu, L["Font"], "font", 1, #fontList, 1, fontList)
-    
-    -- Font size range (4-30 points)
-    AddFakeSliderSubmenu(textMenu, _G.FONT_SIZE, "fontsize", 4, 30, 1, nil)
-    
-    textMenu:CreateDivider()
-    textMenu:CreateColorSwatch(L["FontColor"], function()
-      OpenColorPicker("fontcolor")
-    end, {r = profile.fontcolor.r, g = profile.fontcolor.g, b = profile.fontcolor.b})
 
-    textMenu:CreateCheckbox(L["OutlineInfo"], 
-      function() return profile.outline end, 
-      function() profile.outline = not profile.outline; InFlight:UpdateLook() end)
-    
-    textMenu:CreateCheckbox(L["OutlineTime"], 
-      function() return profile.outlinetime end, 
-      function() profile.outlinetime = not profile.outlinetime; InFlight:UpdateLook() end)
+    -- The face and its size, then how it is drawn, then what is written with it.
+    local fontList = InFlight:GetFontList()
+    AddFakeSliderSubmenu(textMenu, L["Font"], "font", 1, #fontList, 1, fontList)
+    AddFakeSliderSubmenu(textMenu, L["FontSize"], "fontsize", 4, 30, 1, nil)
+
+    textMenu:CreateDivider()
+
+    AddColorSwatch(textMenu, L["FontColor"], "fontcolor")
+    AddCheckbox(textMenu, L["OutlineInfo"], "outline")
+    AddCheckbox(textMenu, L["OutlineTime"], "outlinetime")
+
+    textMenu:CreateDivider()
+
+    AddCheckbox(textMenu, L["CompactMode"], "inline")
+
+    -- Compact mode wins over both of these in UpdateLook, so grey them out rather
+    -- than leaving controls that quietly do nothing, exactly as the layout editor
+    -- does. SetEnabled takes a predicate, and a checkbox refreshes the menu when
+    -- it is clicked, so the two follow compact mode as it is toggled.
+    local function NotCompact()
+      return not Get("inline")
+    end
+
+    local twoLines = AddCheckbox(textMenu, L["TwoLines"], "twolines")
+    twoLines:SetEnabled(NotCompact)
+
+    local toText = textMenu:CreateButton(L["ToText"], function() ShowToTextDialog() end)
+    toText:SetEnabled(NotCompact)
+    toText:SetTitleAndTextTooltip(L["ToText"], tips.totext)
 
     mainMenu:CreateDivider()
 
     -- ===== OTHER OPTIONS =====
     local otherMenu = mainMenu:CreateButton(_G.OTHER)
     otherMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
-    
-    otherMenu:CreateCheckbox(L["ShowChat"], 
-      function() return profile.chatlog end, 
-      function() profile.chatlog = not profile.chatlog; InFlight:UpdateLook() end)
-    
-    otherMenu:CreateCheckbox(L["ConfirmFlight"], 
-      function() return profile.confirmflight end, 
-      function() profile.confirmflight = not profile.confirmflight; InFlight:UpdateLook() end)
-    
-    otherMenu:CreateCheckbox(L["PerCharOptions"], 
-      function() return profile.perchar end, 
-      function() TogglePerCharProfile() end)
-    
+
+    AddCheckbox(otherMenu, L["ShowChat"], "chatlog")
+    AddCheckbox(otherMenu, L["ConfirmFlight"], "confirmflight")
+
     otherMenu:CreateDivider()
-    
-    otherMenu:CreateButton(L["ResetOptions"], function()
-      ResetOptions()
-    end)
-    
-    otherMenu:CreateButton(L["ResetFlightTimes"], function()
+
+    otherMenu:CreateButton(L["ResetToDefaults"], function()
+      ResetToDefaults()
+    end):SetTitleAndTextTooltip(L["ResetToDefaults"], L["ResetToDefaultsTooltip"])
+
+    otherMenu:CreateDivider()
+
+    -- Both of these act on flight times the addon does not already ship, so with
+    -- none recorded there is nothing to export and nothing a reset would take
+    -- away. Greyed out rather than left there to do nothing, and the tooltip
+    -- says why rather than leaving the player to guess.
+    local function FlightTimeTooltip(title, description)
+      return function(tooltip)
+        GameTooltip_SetTitle(tooltip, title)
+        GameTooltip_AddNormalLine(tooltip, description, true)
+        if not HasNewFlightData() then
+          GameTooltip_AddBlankLineToTooltip(tooltip)
+          GameTooltip_AddErrorLine(tooltip, L["NoNewFlightTimes"], true)
+        end
+      end
+    end
+
+    local resetTimes = otherMenu:CreateButton(L["ResetFlightTimes"], function()
       ResetFlightTimes()
     end)
-    
-    otherMenu:CreateButton(L["ExportFlightTimes"], function()
+    resetTimes:SetEnabled(HasNewFlightData)
+    resetTimes:SetTooltip(FlightTimeTooltip(L["ResetFlightTimes"], L["ResetFlightTimesTooltip"]))
+
+    local exportTimes = otherMenu:CreateButton(L["ExportFlightTimes"], function()
       ExportFlightTimes()
     end)
+    exportTimes:SetEnabled(HasNewFlightData)
+    exportTimes:SetTooltip(FlightTimeTooltip(L["ExportFlightTimes"], L["ExportFlightTimesTooltip"]))
   end)
 end
 

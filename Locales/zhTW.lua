@@ -1,49 +1,61 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("InFlight", "zhTW")
 if not L then return end
 
-L["ExportMessage"] = "感謝分享您新發現的飛行路徑！\n請將下面的文本複製到剪貼板 (CTRL-C)，並將其張貼到以下網站之一："
-L["Dismiss"] = "關閉"
-L["Select All"] = "全選"
-
-L["AddonDisabled"] = "檢測到錯誤的客戶端版本：禁用插件"
-L["BackgroundColor"] = "背景顏色"
-L["BarColor"] = "時間條顏色"
-L["BarOptions"] = "外觀"
-L["Border"] = "邊框"
-L["BorderColor"] = "邊框顏色"
-L["CompactMode"] = "內嵌模式"
-L["ConfirmFlight"] = "確定飛行"
-L["ConfirmPopup"] = "你確定你要飛到%s?"
-L["CountUp"] = "計數"
-L["DefaultsUpdated"] = "默認數據已更新。"
-L["DestParse"] = "，.+"
-L["Duration"] = "時間："
-L["Enter your 'to' text."] = "輸入你的「至」文字。"
-L["ExportFlightTimes"] = "匯出飛行時間"
-L["FillUp"] = "遞增"
-L["FlightTimeAdded"] = "飛行時間補充："
-L["FlightTimeContribute"] = "%s 飛行時間可供貢獻。輸入\"/inflight export\"來分享。"
-L["FlightTimeUpdated"] = "航班時間更新："
-L["Font"] = "字形"
-L["FontColor"] = "字形顏色"
-L["Height"] = "高度"
-L["OutlineInfo"] = "輪廓信息文本"
-L["OutlineTime"] = "輪廓 時間文本"
-L["PerCharOptions"] = "字符特定選項"
-L["ResetFlightTimes"] = "重置飛行時間"
-L["ResetOptions"] = "重置選項"
-L["ShowChat"] = "顯示聊天消息"
-L["ShowSpark"] = "顯示火花"
-L["TextOptions"] = "字形"
-L["Texture"] = "時間條紋理"
+-- Mouseover on the bar itself
 L["TooltipOption1"] = "Shift-左擊: 移動"
 L["TooltipOption2"] = "右擊: 打開設定選單"
 L["TooltipOption3"] = "<Ctrl鍵左鍵單擊>將強制關閉"
-L["ToText"] = "「到」文字"
-L["TwoLines"] = "顯示為兩行"
-L["UnknownColor"] = "未知顏色"
-L["Width"] = "寬度"
+L["Duration"] = "時間："
 
+-- Settings menu: what a change applies to
+L["PerCharOptions"] = "字符特定選項"
+
+-- Settings menu: Bar Settings
+L["BarOptions"] = "外觀"
+L["Height"] = "高度"
+L["Width"] = "寬度"
+L["Texture"] = "時間條紋理"
+L["Border"] = "邊框"
+L["BarColor"] = "時間條顏色"
+L["UnknownColor"] = "未知顏色"
+L["BackgroundColor"] = "背景顏色"
+L["BorderColor"] = "邊框顏色"
+L["CountUp"] = "計數"
+L["FillUp"] = "遞增"
+L["ShowSpark"] = "顯示火花"
+
+-- Settings menu: Text Settings
+L["TextOptions"] = "字形"
+L["Font"] = "字形"
+L["FontColor"] = "字形顏色"
+L["OutlineInfo"] = "輪廓信息文本"
+L["OutlineTime"] = "輪廓 時間文本"
+L["CompactMode"] = "內嵌模式"
+L["TwoLines"] = "顯示為兩行"
+L["ToText"] = "「到」文字"
+L["Enter your 'to' text."] = "輸入你的「至」文字。"
+
+-- Settings menu: Other
+L["ShowChat"] = "顯示聊天消息"
+L["ConfirmFlight"] = "確定飛行"
+L["ConfirmPopup"] = "你確定你要飛到%s?"
+L["ResetFlightTimes"] = "重置飛行時間"
+L["ExportFlightTimes"] = "匯出飛行時間"
+
+-- Chat messages
+L["FlightTimeAdded"] = "飛行時間補充："
+L["FlightTimeUpdated"] = "航班時間更新："
+L["FlightTimeContribute"] = "%s 飛行時間可供貢獻。輸入\"/inflight export\"來分享。"
+
+-- Export window
+L["ExportMessage"] = "感謝分享您新發現的飛行路徑！\n請將下面的文本複製到剪貼板 (CTRL-C)，並將其張貼到以下網站之一："
+L["Select All"] = "全選"
+L["Dismiss"] = "關閉"
+
+-- Parsing
+L["DestParse"] = "，.+"
+
+-- Flight points and gossip options, looked up by name while in flight
 L["Amber Ledge"] = "琥珀岩臺"
 L["AmberLedgeGossip"] = "我想要去隘境之盾"
 L["Argent Tournament Grounds"] = "銀白聯賽場地"
