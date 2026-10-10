@@ -1372,8 +1372,8 @@ do  -- timer bar
 
     local texture = smed:Fetch("statusbar", look.texture)
     local borderTexture = smed:Fetch("border", look.border)
-    local inset = (look.border=="Textured" and 2) or 4
-    
+    local inset = 4
+
     local backcolor = look.backcolor or {r=0.1, g=0.1, b=0.1, a=0.6}
     local bordercolor = look.bordercolor or {r=0.6, g=0.6, b=0.6, a=0.8}
     
@@ -1610,9 +1610,6 @@ function InFlight:SetLook(key, value)  -- a setting changed outside the layout e
   end
 end
 
-
--- Register dummy border for styling (allows "Textured" border option without an actual texture file)
-smed:Register("border", "Textured", "\\Interface\\None")
 
 -- One tooltip per setting, keyed the way the settings themselves are, so that the
 -- settings menu and the layout editor cannot end up describing the same setting
