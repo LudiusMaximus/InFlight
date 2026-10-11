@@ -95,28 +95,76 @@ end
 
 
 
--- Support for flightpaths that are started by gossip options.
-local t = {
-  [L["Amber Ledge"]]                = {{ find = L["AmberLedgeGossip"],        s = "Amber Ledge",                d = "Transitus Shield (Scenic Route)" }},
-  [L["Argent Tournament Grounds"]]  = {{ find = L["ArgentTournamentGossip"],  s = "Argent Tournament Grounds",  d = "Return" }},
-  [L["Blackwind Landing"]]          = {{ find = L["BlackwindLandingGossip"],  s = "Blackwind Landing",          d = "Skyguard Outpost" }},
-  [L["Caverns of Time"]]            = {{ find = L["CavernsOfTimeGossip"],     s = "Caverns of Time",            d = "Nozdormu's Lair" }},
-  [L["Expedition Point"]]           = {{ find = L["ExpeditionPointGossip"],   s = "Expedition Point",           d = "Shatter Point" }},
-  [L["Hellfire Peninsula"]]         = {{ find = L["HellfirePeninsulaGossip"], s = "Honor Point",                d = "Shatter Point" }},
-  [L["Nighthaven"]]                 = {{ find = L["NighthavenGossipA"],       s = "Nighthaven",                 d = "Rut'theran Village" },
-                                      {  find = L["NighthavenGossipH"],       s = "Nighthaven",                 d = "Thunder Bluff" }},
-  [L["Old Hillsbrad Foothills"]]    = {{ find = L["OldHillsbradGossip"],      s = "Old Hillsbrad Foothills",    d = "Durnholde Keep" }},
-  [L["Reaver's Fall"]]              = {{ find = L["Reaver'sFallGossip"],      s = "Reaver's Fall",              d = "Spinebreaker Post" }},
-  [L["Ring of Transference"]]       = {{ find = L["ToBastionGossip1"],        s = "Oribos",                     d = "Bastion" },
-                                      {  find = L["ToBastionGossip2"],        s = "Oribos",                     d = "Bastion" }},
-  [L["Shatter Point"]]              = {{ find = L["ShatterPointGossip"],      s = "Shatter Point",              d = "Honor Point" }},
-  [L["Skyguard Outpost"]]           = {{ find = L["SkyguardOutpostGossip"],   s = "Skyguard Outpost",           d = "Blackwind Landing" }},
-  [L["Stormwind City"]]             = {{ find = L["StormwindCityGossip"],     s = "Stormwind City",             d = "Return" }},
-  [L["Sun's Reach Harbor"]]         = {{ find = L["SSSAGossip"],              s = "Shattered Sun Staging Area", d = "Return" },
-                                      {  find = L["SSSAGossip2"],             s = "Shattered Sun Staging Area", d = "The Sin'loren" }},
-  [L["The Sin'loren"]]              = {{ find = L["TheSin'lorenGossip"],      s = "The Sin'loren",              d = "Shattered Sun Staging Area" }},
-  [L["Valgarde"]]                   = {{ find = L["ValgardeGossip"],          s = "Valgarde",                   d = "Explorers' League Outpost" }},
+-- The places gossip flights start from or go to, by AreaTable ID. The client
+-- names them in its own language, in exactly the text GetMinimapZoneText
+-- returns, and older clients use older names, so they are not translated here.
+-- Honor Point has no area of its own and lies in Hellfire Peninsula. It and the
+-- other destinations that are no area are translated in the locale files.
+local areaIDs = {
+  ["Amber Ledge"]                = 4023,
+  ["Argent Tournament Grounds"]  = 4658,
+  ["Blackwind Landing"]          = 3973,
+  ["Caverns of Time"]            = 1941,
+  ["Durnholde Keep"]             = 2370,
+  ["Expedition Point"]           = 3815,
+  ["Explorers' League Outpost"]  = 3997,
+  ["Hellfire Peninsula"]         = 3483,
+  ["Nighthaven"]                 = 2361,
+  ["Old Hillsbrad Foothills"]    = 2367,
+  ["Rut'theran Village"]         = 702,
+  ["Shatter Point"]              = 3920,
+  ["Shattered Sun Staging Area"] = 4085,
+  ["Skyguard Outpost"]           = 3964,
+  ["Stormwind City"]             = 1519,
+  ["Sun's Reach Harbor"]         = 4087,
+  ["The Sin'loren"]              = 4082,
+  ["Thunder Bluff"]              = 1638,
+  ["Valgarde"]                   = 3981,
 }
+
+-- The client's name for a place, nil for an area this client does not have.
+local function AreaName(place)
+  local name = C_Map.GetAreaInfo(areaIDs[place])
+  if name and name ~= "" then
+    return name
+  end
+end
+
+-- A place's name for the bar: the client's, else the locale file's, else English.
+local function PlaceName(place)
+  return areaIDs[place] and AreaName(place) or L[place]
+end
+
+
+-- Support for flightpaths that are started by gossip options, by the area the
+-- flight master stands in.
+local gossipFlights = {
+  ["Amber Ledge"]                = {{ find = L["AmberLedgeGossip"],        s = "Amber Ledge",                d = "Transitus Shield (Scenic Route)" }},
+  ["Argent Tournament Grounds"]  = {{ find = L["ArgentTournamentGossip"],  s = "Argent Tournament Grounds",  d = "Return" }},
+  ["Blackwind Landing"]          = {{ find = L["BlackwindLandingGossip"],  s = "Blackwind Landing",          d = "Skyguard Outpost" }},
+  ["Caverns of Time"]            = {{ find = L["CavernsOfTimeGossip"],     s = "Caverns of Time",            d = "Nozdormu's Lair" }},
+  ["Expedition Point"]           = {{ find = L["ExpeditionPointGossip"],   s = "Expedition Point",           d = "Shatter Point" }},
+  ["Hellfire Peninsula"]         = {{ find = L["HellfirePeninsulaGossip"], s = "Honor Point",                d = "Shatter Point" }},
+  ["Nighthaven"]                 = {{ find = L["NighthavenGossipA"],       s = "Nighthaven",                 d = "Rut'theran Village" },
+                                    {  find = L["NighthavenGossipH"],       s = "Nighthaven",                 d = "Thunder Bluff" }},
+  ["Old Hillsbrad Foothills"]    = {{ find = L["OldHillsbradGossip"],      s = "Old Hillsbrad Foothills",    d = "Durnholde Keep" }},
+  ["Shatter Point"]              = {{ find = L["ShatterPointGossip"],      s = "Shatter Point",              d = "Honor Point" }},
+  ["Skyguard Outpost"]           = {{ find = L["SkyguardOutpostGossip"],   s = "Skyguard Outpost",           d = "Blackwind Landing" }},
+  ["Stormwind City"]             = {{ find = L["StormwindCityGossip"],     s = "Stormwind City",             d = "Return" }},
+  ["Sun's Reach Harbor"]         = {{ find = L["SSSAGossip"],              s = "Shattered Sun Staging Area", d = "Return" },
+                                    {  find = L["SSSAGossip2"],             s = "Shattered Sun Staging Area", d = "The Sin'loren" }},
+  ["The Sin'loren"]              = {{ find = L["TheSin'lorenGossip"],      s = "The Sin'loren",              d = "Shattered Sun Staging Area" }},
+  ["Valgarde"]                   = {{ find = L["ValgardeGossip"],          s = "Valgarde",                   d = "Explorers' League Outpost" }},
+}
+
+-- The same flights by the client's name of the area, made on first use.
+local gossipFlightsByArea
+
+-- Gossip texts are compared without spaces and with typographic apostrophes
+-- made plain, as clients and translations differ in both.
+local function Simplify(text)
+  return (gsub(gsub(text, "’", "'"), "%s+", ""))
+end
 
 
 local function PrepareMiscFlight(buttonText)
@@ -124,15 +172,25 @@ local function PrepareMiscFlight(buttonText)
     return
   end
 
-  local subzone = GetMinimapZoneText()
-  local tsz = t[subzone]
+  if not gossipFlightsByArea then
+    gossipFlightsByArea = {}
+    for area, flights in pairs(gossipFlights) do
+      local name = AreaName(area)
+      if name then
+        gossipFlightsByArea[name] = flights
+      end
+    end
+  end
+
+  local tsz = gossipFlightsByArea[GetMinimapZoneText()]
   if not tsz then
     return
   end
 
+  buttonText = Simplify(buttonText)
   local source, destination
   for _, sz in ipairs(tsz) do
-    if strfind(buttonText, sz.find, 1, true) then
+    if strfind(buttonText, Simplify(sz.find), 1, true) then
       source = sz.s
       destination = sz.d
       break
@@ -1055,8 +1113,8 @@ function InFlight:InitSource(isTaxiMap)  -- cache source location and hook toolt
     local taxiMapID = GetViewedTaxiMapID()
 
     -- Workaround for Blizzard bug on OutLand Flight Map
-    if taxiMapID == 1467 and GetMinimapZoneText() == L["Shatter Point"] then
-      taxiSrcName = L["Shatter Point"]
+    if taxiMapID == 1467 and GetMinimapZoneText() == PlaceName("Shatter Point") then
+      taxiSrcName = PlaceName("Shatter Point")
       taxiSrc = "Shatter Point"
 
     -- Flying between Dragon Isles (2057) and Zaralek Cavern (2175).
@@ -1228,11 +1286,11 @@ recoverFrame:SetScript("OnEvent", function(this, event, isInitialLogin, isReload
 end)
 
 -------------------------------------------
-function InFlight:StartMiscFlight(src, dst)  -- called from InFlight_Load for special flights
+function InFlight:StartMiscFlight(src, dst)  -- called for flights started by a gossip option
 -------------------------------------------
-  taxiSrcName = L[src]
+  taxiSrcName = PlaceName(src)
   taxiSrc = src
-  taxiDstName = L[dst]
+  taxiDstName = PlaceName(dst)
   taxiDst = dst
 
   local dstNodes = GetDstNodes(taxiSrc, playerFaction)

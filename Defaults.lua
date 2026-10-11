@@ -9166,12 +9166,6 @@ InFlight.defaults = {
       ["Old Hillsbrad Foothills"] = {   -- Flightpath started by gossip option.
         ["Durnholde Keep"] = 110,
       },
-      ["Oribos"] = {   -- Flightpath started by gossip option.
-        ["Bastion"] = 51,
-      },
-      ["Reaver's Fall"] = {   -- Flightpath started by gossip option.
-        ["Spinebreaker Post"] = 46,
-      },
       ["Shattered Sun Staging Area"] = {   -- Flightpath started by gossip option.
         ["Return"] = 254,
         ["The Sin'loren"] = 59,
@@ -18375,9 +18369,6 @@ InFlight.defaults = {
       ["Old Hillsbrad Foothills"] = {   -- Flightpath started by gossip option.
         ["Durnholde Keep"] = 89,
       },
-      ["Oribos"] = {   -- Flightpath started by gossip option.
-        ["Bastion"] = 51,
-      },
       ["Shatter Point"] = {   -- Flightpath started by gossip option.
         ["Honor Point"] = 40,
       },
@@ -22394,9 +22385,6 @@ local global_tbc = {
     },
     ["Nighthaven"] = {   -- Flightpath started by gossip option.
       ["Thunder Bluff"] = 400,
-    },
-    ["Reaver's Fall"] = {   -- Flightpath started by gossip option.
-      ["Spinebreaker Post"] = 47,
     },
   },
   ["Alliance"] = {
