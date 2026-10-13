@@ -60,6 +60,11 @@ local function Drawn(key)
   return value
 end
 
+-- While a colour picker is open for the known or the unknown fill, "known" or
+-- "unknown": the bar shows that fill whatever it is showing otherwise, so that
+-- the colour can be judged as it is picked. Drawn only, like hovered.
+local pickedFill
+
 local playerFaction = UnitFactionGroup("player")
 
 
@@ -445,6 +450,47 @@ local function SetToPreview()  -- fill the bar with the preview's dummy flight
   sb:SetStatusBarColor(barcolor.r, barcolor.g, barcolor.b, barcolor.a)
   spark:SetPoint("CENTER", sb, "LEFT", look.width * value / previewTotal, 0)
   spark:SetShown(look.spark)
+end
+
+-- The unknown fill is for a flight of unknown length, unless a colour picker is
+-- open for the other fill.
+local function ShowsUnknown()
+  if pickedFill then
+    return pickedFill == "unknown"
+  end
+  return not previewActive and not endTime
+end
+
+-- The time text, matching the fill: beside the unknown one the time flown up to
+-- "??", beside a known one the time to go, or flown with Count Up, of its length.
+local function ShowTime(flown, total, totalText)
+  if ShowsUnknown() then
+    timeText:SetFormattedText("%s / %s", FormatTime(flown), FormatTime(nil))
+  elseif not total then
+    -- A flight of unknown length wearing the preview's known fill.
+    ShowTime(previewDone, previewTotal)
+  else
+    timeText:SetFormattedText("%s / %s",
+      FormatTime(look.countup and flown or total - flown), totalText or FormatTime(total))
+  end
+end
+
+local function ShowFill()  -- the fill the bar shows now, known or unknown
+  if ShowsUnknown() then
+    SetToUnknown()
+  elseif previewActive or not endTime then
+    -- The preview, or the preview's flight standing in for one of unknown length.
+    SetToPreview()
+  else
+    ratio = look.width / endTime
+    local barcolor = look.barcolor or {r=0.5, g=0.5, b=0.8, a=1.0}
+    sb:SetMinMaxValues(0, endTime)
+    sb:SetStatusBarColor(barcolor.r or 0.5, barcolor.g or 0.5, barcolor.b or 0.8, barcolor.a or 1.0)
+    spark:SetShown(look.spark)
+  end
+  -- The bar may have been showing another fill, so a flight's own value and time
+  -- go back on with the next update, which this makes the very next frame.
+  elapsed = throt
 end
 
 local function GetEstimatedTime(slot)  -- estimates flight times based on hops
@@ -1485,9 +1531,9 @@ do  -- timer bar
 
       if endTime then  -- update statusbar if destination time is known
         if totalTime - 2 > endTime then   -- in case the flight is longer than expected
-          SetToUnknown()
           endTime = nil
           endText = FormatTime(endTime)
+          ShowFill()
         else
           local curTime = totalTime
           if curTime > endTime then
@@ -1496,15 +1542,17 @@ do  -- timer bar
             curTime = 0
           end
 
-          local value = look.fill and curTime or (endTime - curTime)
-          sb:SetValue(value)
-          spark:SetPoint("CENTER", sb, "LEFT", value * ratio, 0)
+          -- Not while a colour picker has the bar showing the unknown fill.
+          if not ShowsUnknown() then
+            local value = look.fill and curTime or (endTime - curTime)
+            sb:SetValue(value)
+            spark:SetPoint("CENTER", sb, "LEFT", value * ratio, 0)
+          end
 
-          value = look.countup and curTime or (endTime - curTime)
-          timeText:SetFormattedText("%s / %s", FormatTime(value), endText)
+          ShowTime(curTime, endTime, endText)
         end
       else  -- destination time is unknown, so show that it's timing
-        timeText:SetFormattedText("%s / %s", FormatTime(totalTime), endText)
+        ShowTime(totalTime)
       end
     end
 
@@ -1610,20 +1658,7 @@ do  -- timer bar
     end
 
     spark:SetHeight(look.height * 2.4)
-    if previewActive then
-      SetToPreview()
-    elseif endTime then  -- in case we're in flight
-      ratio = look.width / endTime
-      local barcolor = look.barcolor or {r=0.5, g=0.5, b=0.8, a=1.0}
-      sb:SetStatusBarColor(barcolor.r or 0.5, barcolor.g or 0.5, barcolor.b or 0.8, barcolor.a or 1.0)
-      if look.spark then
-        spark:Show()
-      else
-        spark:Hide()
-      end
-    else
-      SetToUnknown()
-    end
+    ShowFill()
 
     local fontcolor = look.fontcolor or {r=1.0, g=1.0, b=1.0, a=1.0}
 
@@ -1672,8 +1707,7 @@ do  -- timer bar
     -- Down here, because the time text has no font until this function sets one,
     -- which is why nothing else writes text before that point either.
     if previewActive then
-      timeText:SetFormattedText("%1$s / %2$s",
-        FormatTime(look.countup and previewDone or previewTotal - previewDone), FormatTime(previewTotal))
+      ShowTime(previewDone, previewTotal)
     end
   end
 
@@ -1860,6 +1894,17 @@ function InFlight:PreviewLook(key, value)  -- try a dropdown option on the bar
   else
     hovered[key] = value
   end
+  self:UpdateLook()
+end
+
+-- Which fill a colour picker shows on the bar while it is open. The background
+-- is seen only beside the known fill, as the unknown one fills the whole bar.
+local pickedFills = { barcolor = "known", backcolor = "known", unknowncolor = "unknown" }
+
+-----------------------------------------------
+function InFlight:ShowPickedFill(colorKey, open)  -- while a colour picker is open for colorKey
+-----------------------------------------------
+  pickedFill = open and pickedFills[colorKey] or nil
   self:UpdateLook()
 end
 
@@ -2147,6 +2192,7 @@ function InFlight.ShowSettings()
       color = colorTable,
       colorButton = InFlight.colorButtons[colorKey],
       OnPick = function(r, g, b, a) SetColor(colorKey, r, g, b, a) end,
+      OnPicker = function(open) InFlight:ShowPickedFill(colorKey, open) end,
     })
 
     if not pickerHooked then

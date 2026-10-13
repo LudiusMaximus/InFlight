@@ -49,6 +49,14 @@ local function TryOn(key)
   end
 end
 
+-- Shows the fill a colour belongs to while its picker is open, as the settings
+-- menu does too.
+local function ShowFill(key)
+  return function(open)
+    InFlight:ShowPickedFill(key, open)
+  end
+end
+
 
 -- The keys a layout may hold, filled in from the settings list below so that the
 -- two cannot drift apart. Position is part of every entry.
@@ -216,10 +224,12 @@ function InFlight:SetupEditMode()
     { type = "separator" },
 
     { key = "texture", name = L["Texture"], type = "dropdown", options = TextureOptions, OnHover = TryOn("texture") },
-    { key = "barcolor",     name = L["BarColor"],        type = "color", colorButton = InFlight.colorButtons.barcolor },
+    { key = "barcolor",     name = L["BarColor"],        type = "color",
+      colorButton = InFlight.colorButtons.barcolor,     OnPicker = ShowFill("barcolor") },
     { key = "unknowncolor", name = L["UnknownColor"],    type = "color", sameRow = true,
-      colorButton = InFlight.colorButtons.unknowncolor },
-    { key = "backcolor",    name = L["BackgroundColor"], type = "color", colorButton = InFlight.colorButtons.backcolor },
+      colorButton = InFlight.colorButtons.unknowncolor, OnPicker = ShowFill("unknowncolor") },
+    { key = "backcolor",    name = L["BackgroundColor"], type = "color",
+      colorButton = InFlight.colorButtons.backcolor,    OnPicker = ShowFill("backcolor") },
 
     { type = "separator" },
 
