@@ -8,31 +8,45 @@
 -- replacement for them: everything here goes through InFlight's look table, and
 -- db.profile is left alone. See the comment on that table in InFlight.lua.
 
-local smed = LibStub("LibSharedMedia-3.0")
 local LLS = LibStub("LibLayoutSettings-1.0", true)
 
 
--- Turns a list of LibSharedMedia names into dropdown options.
-local function ToOptions(names, skip)
+-- Turns a list of media names into dropdown options, shown the way the settings
+-- menu shows them. A list of textures or borders comes in groups, false between
+-- them, which becomes a divider.
+local function ToOptions(names)
   local options = {}
   for _, name in ipairs(names) do
-    if not (skip and skip[name]) then
-      options[#options + 1] = { value = name, text = name }
+    if name == false then
+      options[#options + 1] = { separator = true }
+    else
+      options[#options + 1] = { value = name, text = InFlight:MediaDisplayName(name) }
     end
   end
   return options
 end
 
-local function MediaOptions(mediaType, skip)
-  return function()
-    return ToOptions(smed:List(mediaType), skip)
-  end
-end
-
--- Fonts go through InFlight, which drops the ones that duplicate another on this
--- client, so that both panels offer the same list.
+-- Media lists go through InFlight, so that both panels offer the same ones:
+-- fonts without those that duplicate another on this client, textures and
+-- borders with Blizzard's from BarStyles.lua.
 local function FontOptions()
   return ToOptions(InFlight:GetFontList())
+end
+
+local function TextureOptions()
+  return ToOptions(InFlight:GetTextureList())
+end
+
+local function BorderOptions()
+  return ToOptions(InFlight:GetBorderList())
+end
+
+-- Tries an option on the bar while the mouse rests on it, as the settings menu
+-- does too.
+local function TryOn(key)
+  return function(value)
+    InFlight:PreviewLook(key, value)
+  end
 end
 
 
@@ -187,18 +201,25 @@ function InFlight:SetupEditMode()
 
     { type = "separator" },
 
-    { key = "texture", name = L["Texture"], type = "dropdown", options = MediaOptions("statusbar") },
-    -- "Blizzard Party" is broken as a border, just like in the settings menu.
-    { key = "border",  name = L["Border"],  type = "dropdown", options = MediaOptions("border", { ["Blizzard Party"] = true }) },
+    -- The border with what goes with it, then the texture with its colours: the
+    -- bar's own, the one it wears when the flight is an unknown length, and
+    -- what shows where it is not filled yet. The settings menu has the same
+    -- groups.
+    { key = "border",  name = L["Border"],  type = "dropdown", options = BorderOptions, OnHover = TryOn("border"),
+      refreshOnChange = true },
+    -- Only some borders have a background of their own to show.
+    { key = "borderbg",    name = L["BorderBackground"], type = "checkbox",
+      IsDisabled = function() return not InFlight:BorderHasBackground(InFlight:GetLook("border")) end },
+    { key = "bordercolor", name = L["BorderColor"],      type = "color", sameRow = true },
 
-    -- Read down the left column and it is the two texture colours, in the order
-    -- the dropdowns above them come: the bar's own, then the one it wears when
-    -- the flight is an unknown length. The border colour sits under the border
-    -- dropdown's side, and the background beside the texture it shows through.
+    { type = "separator" },
+
+    { key = "texture", name = L["Texture"], type = "dropdown", options = TextureOptions, OnHover = TryOn("texture") },
     { key = "barcolor",     name = L["BarColor"],        type = "color" },
-    { key = "backcolor",    name = L["BackgroundColor"], type = "color", sameRow = true },
-    { key = "unknowncolor", name = L["UnknownColor"],    type = "color" },
-    { key = "bordercolor",  name = L["BorderColor"],     type = "color", sameRow = true },
+    { key = "unknowncolor", name = L["UnknownColor"],    type = "color", sameRow = true },
+    { key = "backcolor",    name = L["BackgroundColor"], type = "color" },
+
+    { type = "separator" },
 
     { key = "countup", name = L["CountUp"],   type = "checkbox" },
     { key = "fill",    name = L["FillUp"],    type = "checkbox", sameRow = true },
@@ -206,7 +227,7 @@ function InFlight:SetupEditMode()
 
     { type = "separator" },
 
-    { key = "font",      name = L["Font"],      type = "dropdown", options = FontOptions },
+    { key = "font",      name = L["Font"],      type = "dropdown", options = FontOptions, OnHover = TryOn("font") },
     { key = "fontcolor", name = L["FontColor"], type = "color" },
     { key = "outline",     name = L["OutlineInfo"], type = "checkbox" },
     { key = "outlinetime", name = L["OutlineTime"], type = "checkbox", sameRow = true },

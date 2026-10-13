@@ -41,10 +41,23 @@ local look     -- what the bar is drawn from, see below
 local taxiSrc, taxiSrcName, taxiDst, taxiDstName, endTime  -- location data
 local porttaken, takeoff, inworld, outworld, ontaxi        -- flags
 local ratio, endText = 0, "??"                             -- cache variables
-local sb, spark, timeText, locText, bord                   -- frame elements
+local sb, spark, timeText, locText, bord, back             -- frame elements
 local previewActive, previewRequests = nil, {}             -- dummy flight, and who wants it
 local totalTime, startTime, elapsed, throt = 0, 0, 0, 0    -- throttle variables
 local oldTakeTaxiNode
+
+-- A dropdown option tried on while the mouse rests on it, the way the barber
+-- shop tries on a choice: drawn, never stored, so nothing that saves or compares
+-- settings ever sees it. The bar reads texture, border and font through Drawn
+-- for that, and nothing else goes through it.
+local hovered = {}
+local function Drawn(key)
+  local value = hovered[key]
+  if value == nil then
+    value = look[key]
+  end
+  return value
+end
 
 local playerFaction = UnitFactionGroup("player")
 
@@ -337,7 +350,7 @@ local function ApplyBarFonts()
   -- Fetch hands back the default, or a global override, in place of an unknown
   -- key, and nil only when there is no media table at all. So a wrong key gives a
   -- plausible wrong font rather than an error.
-  local fontPath = smed:Fetch("font", look.font)
+  local fontPath = smed:Fetch("font", Drawn("font"))
 
   -- Both have to run, so do not let "and" short circuit the second one away.
   local locOk = ApplyFontTo(locText, fontPath, look.fontsize, look.outline and "OUTLINE" or "")
@@ -1354,9 +1367,15 @@ do  -- timer bar
     spark:SetWidth(16)
     spark:SetBlendMode("ADD")
 
-    bord = CreateFrame("Frame", nil, sb, BackdropTemplateMixin and "BackdropTemplate")  -- border/background
+    bord = CreateFrame("Frame", nil, sb, BackdropTemplateMixin and "BackdropTemplate")  -- LibSharedMedia border
     SetPoints(bord, "TOPLEFT", sb, "TOPLEFT", -5, 5, "BOTTOMRIGHT", sb, "BOTTOMRIGHT", 5, -5)
     bord:SetFrameStrata("LOW")
+
+    -- What shows where the bar is not yet full: the bar's own texture in the
+    -- background colour, a pixel larger all round, unless the border brings a
+    -- background of its own.
+    back = sb:CreateTexture(nil, "BACKGROUND")
+    SetPoints(back, "TOPLEFT", sb, "TOPLEFT", -1, 1, "BOTTOMRIGHT", sb, "BOTTOMRIGHT", 1, -1)
 
     local function onupdate(this, a1)
       elapsed = elapsed + a1
@@ -1549,26 +1568,40 @@ do  -- timer bar
     sb:SetWidth(look.width)
     sb:SetHeight(look.height)
 
-    local texture = smed:Fetch("statusbar", look.texture)
-    local borderTexture = smed:Fetch("border", look.border)
-    local inset = 4
-
     local backcolor = look.backcolor or {r=0.1, g=0.1, b=0.1, a=0.6}
     local bordercolor = look.bordercolor or {r=0.6, g=0.6, b=0.6, a=0.8}
-    
-    
-    -- Create fresh backdrop table to ensure proper SetBackdrop behavior
-    local newBackdrop = {
-      bgFile = texture,
-      edgeFile = borderTexture,
-      edgeSize = 16,
-      insets = { left = inset, right = inset, top = inset, bottom = inset },
-    }
-    
-    bord:SetBackdrop(newBackdrop)
-    bord:SetBackdropColor(backcolor.r or 0.1, backcolor.g or 0.1, backcolor.b or 0.1, backcolor.a or 0.6)
-    bord:SetBackdropBorderColor(bordercolor.r or 0.6, bordercolor.g or 0.6, bordercolor.b or 0.6, bordercolor.a or 0.8)
-    
+
+    -- The texture is a LibSharedMedia file or one of Blizzard's atlases from
+    -- BarStyles.lua. An atlas leaves its own texture coordinates behind, so a
+    -- file has to put the whole texture back.
+    local texture, isAtlas = self:GetBarTextureAsset(Drawn("texture"))
+    if isAtlas then
+      back:SetAtlas(texture)
+    else
+      back:SetTexture(texture)
+      back:SetTexCoord(0, 1, 0, 1)
+    end
+    back:SetVertexColor(backcolor.r or 0.1, backcolor.g or 0.1, backcolor.b or 0.1, backcolor.a or 0.6)
+
+    -- A border of Blizzard's art is drawn by BarStyles.lua, which says how far
+    -- above the bar it reaches, whether it drew a background of its own, how far
+    -- its ends reach into the bar, and how far up the text in the bar sits in its
+    -- opening. Any other is a LibSharedMedia edge, of which "None" reaches
+    -- nowhere and the rest a few pixels above, with whatever room for the text
+    -- BarStyles.lua gives it.
+    local border = Drawn("border")
+    local borderTop, ownBackground, borderInset, borderOffsetY =
+      self:DrawBarBorder(sb, border, bordercolor, backcolor, look.borderbg)
+    if borderTop then
+      bord:SetBackdrop(nil)
+    else
+      bord:SetBackdrop({ edgeFile = smed:Fetch("border", border), edgeSize = 16 })
+      bord:SetBackdropBorderColor(bordercolor.r or 0.6, bordercolor.g or 0.6, bordercolor.b or 0.6, bordercolor.a or 0.8)
+      borderTop = border == "None" and 0 or 2
+      borderInset, borderOffsetY = self:MediaBorderTextOffsets(border)
+    end
+    back:SetShown(not ownBackground)
+
     sb:SetStatusBarTexture(texture)
     if sb:GetStatusBarTexture() then
       sb:GetStatusBarTexture():SetHorizTile(false)
@@ -1612,26 +1645,26 @@ do  -- timer bar
     if look.inline then
       timeText:SetJustifyH("RIGHT")
       timeText:SetJustifyV("MIDDLE")
-      SetPoints(timeText, "RIGHT", sb, "RIGHT", -4, 0)
+      SetPoints(timeText, "RIGHT", sb, "RIGHT", -4 - borderInset, borderOffsetY)
       locText:SetJustifyH("LEFT")
       locText:SetJustifyV("MIDDLE")
-      SetPoints(locText, "LEFT", sb, "LEFT", 4, 0, "RIGHT", timeText, "LEFT", -2, 0)
+      SetPoints(locText, "LEFT", sb, "LEFT", 4 + borderInset, borderOffsetY, "RIGHT", timeText, "LEFT", -2, 0)
       locText:SetText(dstName)
     elseif look.twolines then
       timeText:SetJustifyH("CENTER")
       timeText:SetJustifyV("MIDDLE")
-      SetPoints(timeText, "CENTER", sb, "CENTER", 0, 0)
+      SetPoints(timeText, "CENTER", sb, "CENTER", 0, borderOffsetY)
       locText:SetJustifyH("CENTER")
       locText:SetJustifyV("BOTTOM")
-      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, look.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, (look.border=="None" and 1) or 3)
+      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, borderTop + look.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, borderTop + 1)
       locText:SetFormattedText("%s %s\n%s", srcName, look.totext, dstName)
     else
       timeText:SetJustifyH("CENTER")
       timeText:SetJustifyV("MIDDLE")
-      SetPoints(timeText, "CENTER", sb, "CENTER", 0, 0)
+      SetPoints(timeText, "CENTER", sb, "CENTER", 0, borderOffsetY)
       locText:SetJustifyH("CENTER")
       locText:SetJustifyV("BOTTOM")
-      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, look.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, (look.border=="None" and 1) or 3)
+      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, borderTop + look.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, borderTop + 1)
       locText:SetFormattedText("%s %s %s", srcName, look.totext, dstName)
     end
 
@@ -1811,6 +1844,24 @@ function InFlight:GetLook(key)  -- the value the bar is currently drawn with
   return look[key]
 end
 
+----------------------------------------
+function InFlight:PreviewLook(key, value)  -- try a dropdown option on the bar
+----------------------------------------
+  -- A value of nil gives that key's option up again, and no key at all every
+  -- option being tried on.
+  if key == nil then
+    if next(hovered) == nil then
+      return
+    end
+    wipe(hovered)
+  elseif hovered[key] == value then
+    return
+  else
+    hovered[key] = value
+  end
+  self:UpdateLook()
+end
+
 
 ---------------------------------------------
 function InFlight:SetLookOverride(key, value)  -- a layout's own value for this key
@@ -1857,6 +1908,7 @@ InFlight.tooltips = {
   width        = L["WidthTooltip"],
   texture      = L["TextureTooltip"],
   border       = L["BorderTooltip"],
+  borderbg     = L["BorderBackgroundTooltip"],
   bordercolor  = L["BorderColorTooltip"],
   backcolor    = L["BackgroundColorTooltip"],
   barcolor     = L["BarColorTooltip"],
@@ -1876,9 +1928,19 @@ InFlight.tooltips = {
 }
 
 
+-- The colour picker takes the place of the settings menu, which closes as it
+-- opens. Where the menu stood and which submenu was open is kept here, and the
+-- menu comes back like that once the picker is done with, whether by OK or by
+-- Cancel.
+local reopenMenu, pickerHooked
+
 --------------------------------
 function InFlight.ShowSettings()
 --------------------------------
+  -- The menu, once open, and its submenus by name, for reopening it.
+  local rootMenu
+  local submenuNames, submenus = {}, {}
+
   -- Helper: Redraw the bar and let the edit mode layout, if one owns the bar,
   -- take the change on board. Everything in this menu is meant to stick.
   local function UpdateLook()
@@ -2086,6 +2148,15 @@ function InFlight.ShowSettings()
       end,
     }
     ColorPickerFrame:SetupColorPickerAndShow(colorInfo)
+
+    if not pickerHooked then
+      pickerHooked = true
+      ColorPickerFrame:HookScript("OnHide", function()
+        if reopenMenu then
+          InFlight.ShowSettings()
+        end
+      end)
+    end
   end
 
   -- Helper: A color swatch for one setting, carrying the same tooltip the layout
@@ -2093,13 +2164,26 @@ function InFlight.ShowSettings()
   local function AddColorSwatch(menu, label, key)
     local color = Get(key)
     local entry = menu:CreateColorSwatch(label,
-      function() OpenColorPicker(key) end,
+      function()
+        -- In screen pixels, as the menu that comes back may be scaled otherwise.
+        local scale = rootMenu:GetEffectiveScale()
+        reopenMenu = { submenu = submenuNames[menu],
+          left = rootMenu:GetLeft() * scale, top = rootMenu:GetTop() * scale }
+        OpenColorPicker(key)
+      end,
       {r = color.r, g = color.g, b = color.b})
 
     if tips[key] then
       entry:SetTitleAndTextTooltip(label, tips[key])
     end
     return entry
+  end
+
+  -- Helper: Try a list option on the bar while the mouse rests on it, the way
+  -- the layout editor's dropdowns do. Closing the menu gives it up too.
+  local function TryOnHover(radio, profileKey, itemName)
+    radio:HookOnEnter(function() InFlight:PreviewLook(profileKey, itemName) end)
+    radio:HookOnLeave(function() InFlight:PreviewLook(profileKey, nil) end)
   end
 
   -- Helper: Create slider submenu with pagination for large ranges
@@ -2121,33 +2205,45 @@ function InFlight.ShowSettings()
     if itemTable then
       -- For named lists (textures, borders, fonts), check if pagination is needed
       local totalItems = maxValue - minValue + 1
-      
+
       if totalItems <= itemsPerPage then
         -- Display all items directly if 20 or fewer
         for i = minValue, maxValue, stepSize do
           local itemName = itemTable[i]
-          sliderButton:CreateRadio(itemName, 
-            function() return Get(profileKey) == itemName end, 
-            function() Set(profileKey, itemName); return MenuResponse.Refresh end)
+          -- A list of textures or borders comes in groups, false between them.
+          if itemName == false then
+            sliderButton:CreateDivider()
+          else
+            TryOnHover(sliderButton:CreateRadio(InFlight:MediaDisplayName(itemName),
+              function() return Get(profileKey) == itemName end,
+              function() Set(profileKey, itemName); return MenuResponse.Refresh end), profileKey, itemName)
+          end
         end
       else
         -- Paginate into submenus if more than 20 items
         local rangeStart = minValue
-        
+
         while rangeStart <= maxValue do
           local rangeEnd = min(maxValue, rangeStart + itemsPerPage - 1)
-          
+
           local pageLabel = format("%s: %d-%d", sliderLabel, rangeStart, rangeEnd)
           local rangeMenu = sliderButton:CreateButton(pageLabel)
           rangeMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
-          
+
           for i = rangeStart, rangeEnd, stepSize do
             local itemName = itemTable[i]
-            rangeMenu:CreateRadio(itemName, 
-              function() return Get(profileKey) == itemName end, 
-              function() Set(profileKey, itemName); return MenuResponse.Refresh end)
+            -- A divider is only worth drawing between two entries of the page.
+            if itemName == false then
+              if i ~= rangeStart and i ~= rangeEnd then
+                rangeMenu:CreateDivider()
+              end
+            else
+              TryOnHover(rangeMenu:CreateRadio(InFlight:MediaDisplayName(itemName),
+                function() return Get(profileKey) == itemName end,
+                function() Set(profileKey, itemName); return MenuResponse.Refresh end), profileKey, itemName)
+            end
           end
-          
+
           if rangeEnd >= maxValue then
             break
           end
@@ -2158,11 +2254,11 @@ function InFlight.ShowSettings()
       -- For numeric ranges, paginate into ~20-item submenus to prevent screen overflow
       local rangeStart = minValue
       local numberFormat = (stepSize >= 1 and "%d") or (stepSize >= 0.1 and "%.1f") or "%.2f"
-      
+
       while rangeStart <= maxValue do
         -- Calculate range end, aiming for ~20 items but respecting the maximum
         local rangeEnd = min(maxValue, rangeStart + (itemsPerPage - 1) * stepSize)
-        
+
         -- Align range end to avoid ugly boundaries
         local alignmentOffset = rangeEnd % (itemsPerPage * stepSize)
         if rangeEnd ~= maxValue and alignmentOffset > 0 then
@@ -2172,15 +2268,15 @@ function InFlight.ShowSettings()
         local pageLabel = format("%s: %d-%d", sliderLabel, rangeStart, rangeEnd)
         local rangeMenu = sliderButton:CreateButton(pageLabel)
         rangeMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
-        
+
         -- Add all values in this range with the original step size
         for currentValue = rangeStart, rangeEnd, stepSize do
           local value = currentValue  -- Capture in closure to avoid variable capture issues
-          rangeMenu:CreateRadio(format(numberFormat, value), 
-            function() return floor(100 * (Get(profileKey) or 0)) == floor(100 * value) end, 
+          rangeMenu:CreateRadio(format(numberFormat, value),
+            function() return floor(100 * (Get(profileKey) or 0)) == floor(100 * value) end,
             function() Set(profileKey, value); return MenuResponse.Refresh end)
         end
-        
+
         -- Advance to next range or break if we've reached the end
         if rangeEnd >= maxValue then
           break
@@ -2190,7 +2286,7 @@ function InFlight.ShowSettings()
     end
   end
 
-  MenuUtil.CreateContextMenu(UIParent, function(_, mainMenu)
+  rootMenu = MenuUtil.CreateContextMenu(UIParent, function(_, mainMenu)
     mainMenu:CreateTitle("|cff0040ffIn|cff00aaffFlight|r")
     mainMenu:CreateDivider()
 
@@ -2247,33 +2343,31 @@ function InFlight.ShowSettings()
     -- ===== BAR OPTIONS =====
     local barMenu = mainMenu:CreateButton(L["BarOptions"])
     barMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+    submenuNames[barMenu], submenus.bar = "bar", barMenu
 
-    -- Shape first, then what the bar is drawn with, in the order the colours
-    -- below pick those up.
+    -- Shape first, then the border with everything that goes with it, then the
+    -- texture with its colours, the same groups the layout editor has.
     AddFakeSliderSubmenu(barMenu, L["Height"], "height", 4, 150, 1, nil)
     AddFakeSliderSubmenu(barMenu, L["Width"], "width", 40, 1000, 5, nil)
 
-    -- Bar appearance from LibSharedMedia
-    local statusbarList = smed:List("statusbar")
-    local borderList = smed:List("border")
-    -- Remove broken border textures by rebuilding the table
-    local filteredBorderList = {}
-    for _, borderName in ipairs(borderList) do
-      if borderName ~= "Blizzard Party" then
-        table.insert(filteredBorderList, borderName)
-      end
-    end
-    AddFakeSliderSubmenu(barMenu, L["Texture"], "texture", 1, #statusbarList, 1, statusbarList)
-    AddFakeSliderSubmenu(barMenu, L["Border"], "border", 1, #filteredBorderList, 1, filteredBorderList)
+    barMenu:CreateDivider()
+
+    -- LibSharedMedia's borders and textures with Blizzard's from BarStyles.lua.
+    local borderList = InFlight:GetBorderList()
+    AddFakeSliderSubmenu(barMenu, L["Border"], "border", 1, #borderList, 1, borderList)
+    -- Only some borders have a background of their own to show.
+    AddCheckbox(barMenu, L["BorderBackground"], "borderbg"):SetEnabled(function()
+      return InFlight:BorderHasBackground(InFlight:GetLook("border"))
+    end)
+    AddColorSwatch(barMenu, L["BorderColor"], "bordercolor")
 
     barMenu:CreateDivider()
 
-    -- The two texture colours, then what shows behind them, then the border. The
-    -- same order the layout editor lays its colour block out in.
+    local textureList = InFlight:GetTextureList()
+    AddFakeSliderSubmenu(barMenu, L["Texture"], "texture", 1, #textureList, 1, textureList)
     AddColorSwatch(barMenu, L["BarColor"], "barcolor")
     AddColorSwatch(barMenu, L["UnknownColor"], "unknowncolor")
     AddColorSwatch(barMenu, L["BackgroundColor"], "backcolor")
-    AddColorSwatch(barMenu, L["BorderColor"], "bordercolor")
 
     barMenu:CreateDivider()
 
@@ -2285,6 +2379,7 @@ function InFlight.ShowSettings()
     -- ===== TEXT OPTIONS =====
     local textMenu = mainMenu:CreateButton(L["TextOptions"])
     textMenu:SetOnEnter(function(_, desc) desc:ForceOpenSubmenu() end)
+    submenuNames[textMenu], submenus.text = "text", textMenu
 
     -- The face and its size, then how it is drawn, then what is written with it.
     local fontList = InFlight:GetFontList()
@@ -2360,6 +2455,26 @@ function InFlight.ShowSettings()
     exportTimes:SetEnabled(HasNewFlightData)
     exportTimes:SetTooltip(FlightTimeTooltip(L["ExportFlightTimes"], L["ExportFlightTimesTooltip"]))
   end)
+
+  if not rootMenu then
+    reopenMenu = nil
+    return
+  end
+
+  -- Whatever was being tried on is given up with the menu, picked or not.
+  rootMenu:SetClosedCallback(function() InFlight:PreviewLook() end)
+
+  -- Back from the colour picker: where it stood, with the submenu it had open.
+  local reopen = reopenMenu
+  reopenMenu = nil
+  if reopen then
+    local scale = rootMenu:GetEffectiveScale()
+    rootMenu:ClearAllPoints()
+    rootMenu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", reopen.left / scale, reopen.top / scale)
+    if submenus[reopen.submenu] then
+      submenus[reopen.submenu]:ForceOpenSubmenu()
+    end
+  end
 end
 
 

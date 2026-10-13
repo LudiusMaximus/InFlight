@@ -42,6 +42,7 @@ embeds.xml
 
 Locales\Locales.xml
 InFlight.lua
+BarStyles.lua
 Defaults.lua
 EditMode.lua
 

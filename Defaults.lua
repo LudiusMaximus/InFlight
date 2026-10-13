@@ -9,6 +9,7 @@ InFlight.defaults = {
     countup = true,
     fill = true,
     spark = true,
+    borderbg = true,
     texture = "Blizzard",
     width = 300,
     height = 14,
