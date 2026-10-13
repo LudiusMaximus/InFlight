@@ -210,14 +210,16 @@ function InFlight:SetupEditMode()
     -- Only some borders have a background of their own to show.
     { key = "borderbg",    name = L["BorderBackground"], type = "checkbox",
       IsDisabled = function() return not InFlight:BorderHasBackground(InFlight:GetLook("border")) end },
-    { key = "bordercolor", name = L["BorderColor"],      type = "color", sameRow = true },
+    { key = "bordercolor", name = L["BorderColor"],      type = "color", sameRow = true,
+      colorButton = InFlight.colorButtons.bordercolor },
 
     { type = "separator" },
 
     { key = "texture", name = L["Texture"], type = "dropdown", options = TextureOptions, OnHover = TryOn("texture") },
-    { key = "barcolor",     name = L["BarColor"],        type = "color" },
-    { key = "unknowncolor", name = L["UnknownColor"],    type = "color", sameRow = true },
-    { key = "backcolor",    name = L["BackgroundColor"], type = "color" },
+    { key = "barcolor",     name = L["BarColor"],        type = "color", colorButton = InFlight.colorButtons.barcolor },
+    { key = "unknowncolor", name = L["UnknownColor"],    type = "color", sameRow = true,
+      colorButton = InFlight.colorButtons.unknowncolor },
+    { key = "backcolor",    name = L["BackgroundColor"], type = "color", colorButton = InFlight.colorButtons.backcolor },
 
     { type = "separator" },
 

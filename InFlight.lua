@@ -22,6 +22,7 @@ local InFlight = CreateFrame("Frame", "InFlight")  -- no parent is intentional
 
 -- LIBRARIES
 local smed = LibStub("LibSharedMedia-3.0")
+local LLS = LibStub("LibLayoutSettings-1.0")
 
 -- LOCALIZATION
 local L = LibStub("AceLocale-3.0"):GetLocale("InFlight", not debug)
@@ -720,7 +721,7 @@ function InFlight:SetupInFlight()
   end)
 
   panel.name = "InFlight"
-  
+
   local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
   -- Needed to be able to call `Settings.OpenToCategory("InFlight")`
   category.ID = panel.name
@@ -1927,6 +1928,18 @@ InFlight.tooltips = {
   confirmflight = L["ConfirmFlightTooltip"],
 }
 
+-- A White button on the colour picker for the colours laid over the bar's art,
+-- whichever of the settings menu and the layout editor opens it. Many of the
+-- Blizzard textures and borders are coloured already, and only show as drawn
+-- untinted.
+local white = { text = L["White"], tooltip = L["WhiteTooltip"], color = { r = 1, g = 1, b = 1, a = 1 } }
+InFlight.colorButtons = {
+  bordercolor  = white,
+  barcolor     = white,
+  unknowncolor = white,
+  backcolor    = white,
+}
+
 
 -- The colour picker takes the place of the settings menu, which closes as it
 -- opens. Where the menu stood and which submenu was open is kept here, and the
@@ -2127,27 +2140,14 @@ function InFlight.ShowSettings()
   local function OpenColorPicker(colorKey)
     local colorTable = Get(colorKey)
     if not colorTable then return end
-    
-    local colorInfo = {
-      r = colorTable.r, g = colorTable.g, b = colorTable.b, opacity = colorTable.a,
-      hasOpacity = true,
-      swatchFunc = function()
-        local r, g, b = ColorPickerFrame:GetColorRGB()
-        local a = ColorPickerFrame:GetColorAlpha()
-        SetColor(colorKey, r, g, b, a)
-      end,
-      opacityFunc = function()
-        local r, g, b = ColorPickerFrame:GetColorRGB()
-        local a = ColorPickerFrame:GetColorAlpha()
-        SetColor(colorKey, r, g, b, a)
-      end,
-      cancelFunc = function(previousValues)
-        if previousValues then
-          SetColor(colorKey, previousValues.r, previousValues.g, previousValues.b, previousValues.a)
-        end
-      end,
-    }
-    ColorPickerFrame:SetupColorPickerAndShow(colorInfo)
+
+    -- Through the library, so that the picker is the one the layout editor
+    -- shows, White button included.
+    LLS:ShowColorPicker({
+      color = colorTable,
+      colorButton = InFlight.colorButtons[colorKey],
+      OnPick = function(r, g, b, a) SetColor(colorKey, r, g, b, a) end,
+    })
 
     if not pickerHooked then
       pickerHooked = true
