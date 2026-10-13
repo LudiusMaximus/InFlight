@@ -18,22 +18,26 @@ local unpack = unpack
 -- so that the lists can offer the two together.
 local textures = {
   -- CastingBarFrame.xml
-  { name = "Blizzard Cast Bar",           atlas = "ui-castingbar-filling-standard",         border = "Blizzard Cast Bar" },
-  { name = "Blizzard Cast Bar Channel",   atlas = "ui-castingbar-filling-channel",          border = "Blizzard Cast Bar" },
-  { name = "Blizzard Cast Bar Crafting",  atlas = "ui-castingbar-filling-applyingcrafting", border = "Blizzard Cast Bar" },
+  { name = "Blizzard Cast Bar",                 atlas = "ui-castingbar-filling-standard",         border = "Blizzard Cast Bar" },
+  { name = "Blizzard Cast Bar Channel",         atlas = "ui-castingbar-filling-channel",          border = "Blizzard Cast Bar" },
+  { name = "Blizzard Cast Bar Crafting",        atlas = "ui-castingbar-filling-applyingcrafting", border = "Blizzard Cast Bar" },
+  -- CastingBarFrame.lua, for a cast that is interrupted or fails, and for one
+  -- that cannot be interrupted.
+  { name = "Blizzard Cast Bar Interrupted",     atlas = "ui-castingbar-interrupted",              border = "Blizzard Cast Bar" },
+  { name = "Blizzard Cast Bar Uninterruptible", atlas = "ui-castingbar-uninterruptable",          border = "Blizzard Cast Bar" },
   -- PVPHonorSystem.xml
-  { name = "Blizzard Honor",              atlas = "_honorsystem-bar-fill" },
+  { name = "Blizzard Honor",                    atlas = "_honorsystem-bar-fill" },
   -- The status bar widget
-  { name = "Blizzard Junkyard",           atlas = "junkyard-scorebar-fill-medium",          border = "Blizzard Junkyard" },
+  { name = "Blizzard Junkyard",                 atlas = "junkyard-scorebar-fill-medium",          border = "Blizzard Junkyard" },
   -- Blizzard_MonthlyActivities.xml
-  { name = "Blizzard Monthly Activities", atlas = "activities-bar-fill",                    border = "Blizzard Monthly Activities" },
+  { name = "Blizzard Monthly Activities",       atlas = "activities-bar-fill",                    border = "Blizzard Monthly Activities" },
   -- Blizzard_ScenarioObjectiveTracker.xml
-  { name = "Blizzard Mythic+ Timer",      atlas = "ChallengeMode-TimerFill" },
+  { name = "Blizzard Mythic+ Timer",            atlas = "ChallengeMode-TimerFill" },
   -- The status bar widget
-  { name = "Blizzard War Within",         atlas = "thewarwithin-scenario-barframe-fill-brown", border = "Blizzard War Within" },
+  { name = "Blizzard War Within",               atlas = "thewarwithin-scenario-barframe-fill-brown", border = "Blizzard War Within" },
   -- The widget's white fill, which the bar colour tints. Its blue, green, red and
   -- yellow fills are little more than this one tinted, so they are left out.
-  { name = "Blizzard Widget Bar",         atlas = "widgetstatusbar-fill-white",             border = "Blizzard Widget Bar" },
+  { name = "Blizzard Widget Bar",               atlas = "widgetstatusbar-fill-white",             border = "Blizzard Widget Bar" },
 }
 
 
@@ -243,8 +247,9 @@ end
 -- an order does not list, another addon's, follows the ones it does in its
 -- group.
 local textureOrder = {
-  "Blizzard Cast Bar", "Blizzard Cast Bar Channel", "Blizzard Cast Bar Crafting", "Blizzard Widget Bar",
-  "Blizzard Monthly Activities", "Blizzard War Within", "Blizzard Junkyard",
+  "Blizzard Cast Bar", "Blizzard Cast Bar Channel", "Blizzard Cast Bar Crafting", "Blizzard Cast Bar Interrupted",
+  "Blizzard Cast Bar Uninterruptible", "Blizzard Widget Bar", "Blizzard Monthly Activities", "Blizzard War Within",
+  "Blizzard Junkyard",
   "Blizzard", "Blizzard Character Skills Bar", "Blizzard Raid Bar", "Blizzard Honor", "Blizzard Mythic+ Timer",
 }
 
