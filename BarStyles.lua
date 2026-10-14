@@ -574,6 +574,10 @@ function InFlight:StyleSpark(spark, glow, name, height)
   glow:SetBlendMode("ADD")
   glow:SetDrawLayer("OVERLAY", 1)
   glow:SetHeight(glowHeight * scale)
+  -- On the spark, so that it moves with it. See PlaceSpark.
+  glow:ClearAllPoints()
+  glow:SetPoint("RIGHT", spark, "CENTER")
+  glow.inflightWidth = nil
   glowArt[glow] = {
     u0 = info.leftTexCoord, u1 = info.rightTexCoord, v0 = info.topTexCoord + trim, v1 = info.bottomTexCoord - trim,
     width = glowSize[1] * scale,
@@ -591,18 +595,20 @@ end
 --------------------------------------------
 function InFlight:PlaceSpark(spark, glow, x)
 --------------------------------------------
-  -- Each has the one anchor, which SetPoint moves. This runs on every update of
-  -- the bar during a flight.
-  local bar = spark:GetParent()
-  spark:SetPoint("CENTER", bar, "LEFT", x, 0)
+  -- This runs on every update of the bar during a flight. The spark has the one
+  -- anchor, which SetPoint moves, and the glow hangs on the spark, so only its
+  -- cut at the bar's left end is left to do, and only when it has changed.
+  spark:SetPoint("CENTER", spark:GetParent(), "LEFT", x, 0)
 
   local art = glowArt[glow]
   glow.inflightVisible = art ~= nil and x > 0
   if glow.inflightVisible then
     local width = math.min(art.width, x)
-    glow:SetTexCoord(art.u1 - (art.u1 - art.u0) * width / art.width, art.u1, art.v0, art.v1)
-    glow:SetWidth(width)
-    glow:SetPoint("RIGHT", bar, "LEFT", x, 0)
+    if width ~= glow.inflightWidth then
+      glow.inflightWidth = width
+      glow:SetTexCoord(art.u1 - (art.u1 - art.u0) * width / art.width, art.u1, art.v0, art.v1)
+      glow:SetWidth(width)
+    end
   end
   glow:SetShown(glow.inflightVisible and spark:IsShown())
 end

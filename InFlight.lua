@@ -49,8 +49,8 @@ local oldTakeTaxiNode
 
 -- A dropdown option tried on while the mouse rests on it, the way the barber
 -- shop tries on a choice: drawn, never stored, so nothing that saves or compares
--- settings ever sees it. The bar reads texture, border, spark and font through
--- Drawn for that, and nothing else goes through it.
+-- settings ever sees it. The bar reads its size, texture, border, spark, font
+-- and font size through Drawn for that, and nothing else goes through it.
 local hovered = {}
 local function Drawn(key)
   local value = hovered[key]
@@ -312,6 +312,12 @@ local function RGBA(color)
   return color.r, color.g, color.b, color.a
 end
 
+local function ColorText(text, color)  -- with a shadow that fades with it
+  text:SetShadowColor(0, 0, 0, color.a)
+  text:SetShadowOffset(1, -1)
+  text:SetTextColor(RGBA(color))
+end
+
 local function SetToUnknown()  -- setup bar for flights with unknown time
   sb:SetMinMaxValues(0, 1)
   sb:SetValue(1)
@@ -375,8 +381,8 @@ local function ApplyBarFonts()
   local fontPath = smed:Fetch("font", Drawn("font"))
 
   -- Both have to run, so do not let "and" short circuit the second one away.
-  local locOk = ApplyFontTo(locText, fontPath, look.fontsize, look.outline and "OUTLINE" or "")
-  local timeOk = ApplyFontTo(timeText, fontPath, look.fontsize, look.outlinetime and "OUTLINE" or "")
+  local locOk = ApplyFontTo(locText, fontPath, Drawn("fontsize"), look.outline and "OUTLINE" or "")
+  local timeOk = ApplyFontTo(timeText, fontPath, Drawn("fontsize"), look.outlinetime and "OUTLINE" or "")
 
   return locOk and timeOk
 end
@@ -449,6 +455,45 @@ function InFlight:GetFontList()  -- the fonts worth offering on this client
   return offered
 end
 
+-- How far up the bar's text moves for each font, as a share of the font size,
+-- down if negative. Letters sit higher or lower in their line from one font to
+-- the next, and by as much more as the font is larger, so a share holds at every
+-- size where pixels would not: 0.05 is a pixel at size 20. These are the fonts
+-- LibSharedMedia registers itself, on every client. Any other, another addon's
+-- say, is not moved.
+local fontOffsets = {
+  ["2002"] = 0,
+  ["2002 Bold"] = 0,
+  ["AR CrystalzcuheiGBK Demibold"] = 0,
+  ["AR ZhongkaiGBK Medium"] = 0,
+  ["AR ZhongkaiGBK Medium (Combat)"] = 0,
+  ["Arial Narrow"] = -0.05,
+  ["Friz Quadrata TT"] = -0.075,
+  ["MoK"] = 0,
+  ["Morpheus"] = 0,
+  ["Nimrod MT"] = -0.05,
+  ["Skurri"] = -0.1,
+  -- koKR
+  ["굵은 글꼴"] = 0,
+  ["기본 글꼴"] = 0,
+  ["데미지 글꼴"] = 0,
+  ["퀘스트 글꼴"] = 0,
+  -- zhCN and zhTW, which share 聊天 as a name
+  ["伤害数字"] = 0,
+  ["默认"] = 0,
+  ["聊天"] = 0,
+  ["提示訊息"] = 0,
+  ["傷害數字"] = 0,
+  ["預設"] = 0,
+}
+
+-- How far up the text in that font at that size moves, in pixels.
+-----------------------------------------
+function InFlight:FontOffsetY(name, size)
+-----------------------------------------
+  return (fontOffsets[name] or 0) * size
+end
+
 
 -- Sample flight for the preview. Two real flight points, picked at the
 -- median length of the 731 names in the defaults, so that the preview shows the
@@ -463,7 +508,7 @@ local function SetToPreview()  -- fill the bar with the preview's dummy flight
   sb:SetMinMaxValues(0, previewTotal)
   sb:SetValue(value)
   sb:SetStatusBarColor(RGBA(look.barcolor))
-  PlaceSpark(look.width * value / previewTotal)
+  PlaceSpark(Drawn("width") * value / previewTotal)
   ShowSpark(true)
 end
 
@@ -497,7 +542,7 @@ local function ShowFill()  -- the fill the bar shows now, known or unknown
     -- The preview, or the preview's flight standing in for one of unknown length.
     SetToPreview()
   else
-    ratio = look.width / endTime
+    ratio = Drawn("width") / endTime
     sb:SetMinMaxValues(0, endTime)
     sb:SetStatusBarColor(RGBA(look.barcolor))
     ShowSpark(true)
@@ -1314,7 +1359,7 @@ function InFlight:StartTimer(slot)  -- lift off
   if endTime then
     sb:SetMinMaxValues(0, endTime)
     sb:SetValue(look.fill and 0 or endTime)
-    PlaceSpark(look.fill and 0 or look.width)
+    PlaceSpark(look.fill and 0 or Drawn("width"))
   else
     SetToUnknown()
   end
@@ -1720,8 +1765,8 @@ do  -- timer bar
       return
     end
 
-    sb:SetWidth(look.width)
-    sb:SetHeight(look.height)
+    sb:SetWidth(Drawn("width"))
+    sb:SetHeight(Drawn("height"))
 
     -- The texture is a LibSharedMedia file or one of Blizzard's atlases from
     -- BarStyles.lua. An atlas leaves its own texture coordinates behind, so a
@@ -1760,16 +1805,13 @@ do  -- timer bar
       sb:GetStatusBarTexture():SetVertTile(false)
     end
 
-    self:StyleSpark(spark, sparkGlow, Drawn("spark"), look.height)
+    self:StyleSpark(spark, sparkGlow, Drawn("spark"), Drawn("height"))
     ShowFill()
 
     ApplyBarFontsWithRetry()
 
-    for _, text in ipairs({ locText, timeText }) do
-      text:SetShadowColor(0, 0, 0, look.fontcolor.a)
-      text:SetShadowOffset(1, -1)
-      text:SetTextColor(RGBA(look.fontcolor))
-    end
+    ColorText(locText, look.fontcolor)
+    ColorText(timeText, look.fontcolor)
 
     -- The preview shows names of its own rather than writing them into the
     -- flight's variables, which a flight master opened during the preview would
@@ -1777,29 +1819,36 @@ do  -- timer bar
     local srcName = previewActive and previewSrcName or taxiSrcName or "??"
     local dstName = previewActive and previewDstName or taxiDstName or "??"
 
+    -- The font's own offset moves all of the text, the border's only the text in
+    -- the bar.
+    local fontOffsetY = self:FontOffsetY(Drawn("font"), Drawn("fontsize"))
+    local insideY = borderOffsetY + fontOffsetY
+    local aboveTop = borderTop + Drawn("fontsize") * 2.5 + fontOffsetY
+    local aboveBottom = borderTop + 1 + fontOffsetY
+
     if look.inline then
       timeText:SetJustifyH("RIGHT")
       timeText:SetJustifyV("MIDDLE")
-      SetPoints(timeText, "RIGHT", sb, "RIGHT", -4 - borderInset, borderOffsetY)
+      SetPoints(timeText, "RIGHT", sb, "RIGHT", -4 - borderInset, insideY)
       locText:SetJustifyH("LEFT")
       locText:SetJustifyV("MIDDLE")
-      SetPoints(locText, "LEFT", sb, "LEFT", 4 + borderInset, borderOffsetY, "RIGHT", timeText, "LEFT", -2, 0)
+      SetPoints(locText, "LEFT", sb, "LEFT", 4 + borderInset, insideY, "RIGHT", timeText, "LEFT", -2, 0)
       locText:SetText(dstName)
     elseif look.twolines then
       timeText:SetJustifyH("CENTER")
       timeText:SetJustifyV("MIDDLE")
-      SetPoints(timeText, "CENTER", sb, "CENTER", 0, borderOffsetY)
+      SetPoints(timeText, "CENTER", sb, "CENTER", 0, insideY)
       locText:SetJustifyH("CENTER")
       locText:SetJustifyV("BOTTOM")
-      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, borderTop + look.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, borderTop + 1)
+      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, aboveTop, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, aboveBottom)
       locText:SetFormattedText("%s %s\n%s", srcName, look.totext, dstName)
     else
       timeText:SetJustifyH("CENTER")
       timeText:SetJustifyV("MIDDLE")
-      SetPoints(timeText, "CENTER", sb, "CENTER", 0, borderOffsetY)
+      SetPoints(timeText, "CENTER", sb, "CENTER", 0, insideY)
       locText:SetJustifyH("CENTER")
       locText:SetJustifyV("BOTTOM")
-      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, borderTop + look.fontsize*2.5, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, borderTop + 1)
+      SetPoints(locText, "TOPLEFT", sb, "TOPLEFT", -24, aboveTop, "BOTTOMRIGHT", sb, "TOPRIGHT", 24, aboveBottom)
       locText:SetFormattedText("%s %s %s", srcName, look.totext, dstName)
     end
 
@@ -2369,8 +2418,8 @@ function InFlight.ShowSettings()
 
   -- Helper: Try a list option on the bar while the mouse rests on it, the way
   -- the layout editor's dropdowns do. Closing the menu gives it up too.
-  local function TryOnHover(radio, profileKey, itemName)
-    radio:HookOnEnter(function() InFlight:PreviewLook(profileKey, itemName) end)
+  local function TryOnHover(radio, profileKey, value)
+    radio:HookOnEnter(function() InFlight:PreviewLook(profileKey, value) end)
     radio:HookOnLeave(function() InFlight:PreviewLook(profileKey, nil) end)
   end
 
@@ -2460,9 +2509,9 @@ function InFlight.ShowSettings()
         -- Add all values in this range with the original step size
         for currentValue = rangeStart, rangeEnd, stepSize do
           local value = currentValue  -- Capture in closure to avoid variable capture issues
-          rangeMenu:CreateRadio(format(numberFormat, value),
+          TryOnHover(rangeMenu:CreateRadio(format(numberFormat, value),
             function() return floor(100 * (Get(profileKey) or 0)) == floor(100 * value) end,
-            function() Set(profileKey, value); return MenuResponse.Refresh end)
+            function() Set(profileKey, value); return MenuResponse.Refresh end), profileKey, value)
         end
 
         -- Advance to next range or break if we've reached the end
