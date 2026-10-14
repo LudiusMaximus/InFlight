@@ -51,8 +51,8 @@ L["CountUp"] = "正计时"
 L["CountUpTooltip"] = "显示起飞后经过的时间，而不是剩余时间。"
 L["FillUp"] = "填充"
 L["FillUpTooltip"] = "随着飞行进行填充时间条，而不是将其清空。"
-L["ShowSpark"] = "显示闪光"
-L["ShowSparkTooltip"] = "在时间条的前缘显示一个明亮的标记。"
+L["Spark"] = "闪光"
+L["SparkTooltip"] = "时间条前缘的明亮标记。"
 
 -- Settings menu: Text Settings
 L["TextOptions"] = "文字设置"

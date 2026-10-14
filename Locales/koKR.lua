@@ -51,8 +51,8 @@ L["CountUp"] = "카운트 업"
 L["CountUpTooltip"] = "남은 시간 대신 이륙 후 지난 시간을 표시합니다."
 L["FillUp"] = "바 채우기"
 L["FillUpTooltip"] = "비행이 진행됨에 따라 바를 비우는 대신 채웁니다."
-L["ShowSpark"] = "불꽃 표시"
-L["ShowSparkTooltip"] = "바가 진행하는 끝부분에 밝은 표시를 보여줍니다."
+L["Spark"] = "불꽃"
+L["SparkTooltip"] = "바가 진행하는 끝부분의 밝은 표시입니다."
 
 -- Settings menu: Text Settings
 L["TextOptions"] = "글자 설정"

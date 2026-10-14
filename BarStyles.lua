@@ -1,9 +1,10 @@
--- Bar textures and borders made from Blizzard's own art, offered next to the
--- ones LibSharedMedia has. Most are atlases, which LibSharedMedia cannot hold
--- (other addons would hand them to SetTexture as file paths), so InFlight keeps
--- them to itself. Each is drawn the way Blizzard draws it in the part of the UI
--- it comes from, named beside it, unless the comment there says where and why
--- not, and one this client does not have is simply not offered.
+-- Bar textures, borders and sparks made from Blizzard's own art, the textures
+-- and borders offered next to the ones LibSharedMedia has. Most are atlases,
+-- which LibSharedMedia cannot hold (other addons would hand them to SetTexture
+-- as file paths), so InFlight keeps them to itself. Each is drawn the way
+-- Blizzard draws it in the part of the UI it comes from, named beside it, unless
+-- the comment there says where and why not, and one this client does not have
+-- is simply not offered.
 
 local smed = LibStub("LibSharedMedia-3.0")
 
@@ -181,8 +182,8 @@ end
 -- Media names as the settings show them. LibSharedMedia names its own after
 -- Blizzard, and these follow suit, so nearly every name would open on the same
 -- word. The names themselves stay as they are, as they are what is stored and
--- what LibSharedMedia knows them by. None is translated: every addon reading
--- LibSharedMedia shows the same ones.
+-- what LibSharedMedia knows them by. None of them is translated: every addon
+-- reading LibSharedMedia shows the same ones.
 local displayNames = {
   ["Blizzard"] = "Status Bar",  -- TargetingFrame\UI-StatusBar, the unit frames' bar
 }
@@ -441,8 +442,8 @@ function InFlight:DrawBarBorder(bar, name, frameColor, backColor, ownBackground)
       local set = PieceTextures(bar, index)
       for i, piece in ipairs(pieces) do
         local texture = set[i]
-        -- A background below the fill, a frame above it but under the bar's
-        -- text, which is OVERLAY at sublevel 0.
+        -- A background below the fill, a frame above it but under the spark
+        -- and the bar's text, which are OVERLAY at sublevels 0 to 2.
         if part.background then
           texture:SetDrawLayer("BACKGROUND", 0)
         else
@@ -474,4 +475,142 @@ function InFlight:DrawBarBorder(bar, name, frameColor, backColor, ownBackground)
   if border then
     return top, hasBackground, (border.textInset or 0) * scale, (border.textOffsetY or 0) * scale
   end
+end
+
+
+--------------------------------------------------------------------------------
+-- Sparks
+--------------------------------------------------------------------------------
+
+-- The marker riding the filled edge of the bar. Classic is the old cast bar's
+-- spark, which Blizzard's classic style cast bar still uses, sized the way
+-- InFlight always has. Casting and Crafting are today's cast bar's pip with the
+-- glow CastingBarFrame.lua trails behind it for that kind of cast.
+-- CastingBarFrame.xml sizes them for its bar 11 high, and they scale with the
+-- bar from there. Blizzard keeps the glow inside the bar with a mask; here it is
+-- cut to the bar's height and off at its left end instead, which every client
+-- can do.
+--
+-- Left out: the shadow CastingBarFrame.lua trails behind the pip of a channel,
+-- cast_channel_pipshadow, which did not look good even on the Cast Bar Channel
+-- texture it belongs with.
+local pip, pipSize, castBarHeight = "ui-castingbar-pip", { 8, 20 }, 11
+local glowSize = { 37, 12 }
+
+local sparks = {
+  { name = "Casting",  glow = "cast_standard_pipglow" },
+  { name = "Crafting", glow = "cast_crafting_pipglow" },
+  { name = "Classic",  file = [[Interface\CastingBar\UI-CastingBar-Spark]] },
+}
+local classicSpark = "Classic"
+
+local sparkByName = {}
+for _, entry in ipairs(sparks) do
+  sparkByName[entry.name] = entry
+end
+
+local function SparkExists(entry)
+  return entry.file ~= nil or (AtlasExists(pip) and AtlasExists(entry.glow))
+end
+
+-- The sparks on offer on this client, and last none at all.
+--------------------------------
+function InFlight:GetSparkList()
+--------------------------------
+  local offered = {}
+  for _, entry in ipairs(sparks) do
+    if SparkExists(entry) then
+      offered[#offered + 1] = entry.name
+    end
+  end
+  offered[#offered + 1] = "None"
+  return offered
+end
+
+-- What a glow texture is drawing: its piece of the atlas and its full width.
+-- Nil for no glow.
+local glowArt = {}
+
+-- Gives the spark and its glow the look of the spark of that name, at the bar's
+-- height. A name this client has no art for gets the classic spark. Placing them
+-- is PlaceSpark's.
+-------------------------------------------------------
+function InFlight:StyleSpark(spark, glow, name, height)
+-------------------------------------------------------
+  local entry = sparkByName[name]
+  if not entry or not SparkExists(entry) then
+    entry = sparkByName[classicSpark]
+  end
+
+  if entry.file then
+    spark:SetTexture(entry.file)
+    spark:SetTexCoord(0, 1, 0, 1)
+    spark:SetBlendMode("ADD")
+    spark:SetDrawLayer("OVERLAY", 0)
+    spark:SetSize(16, height * 2.4)
+    glowArt[glow] = nil
+    glow.inflightVisible = false
+    glow:Hide()
+    return
+  end
+
+  -- Not SetAtlas: the pip's atlas comes with slice data that tiles its middle,
+  -- which SetAtlas applies, and the texture keeps on for the classic spark too.
+  local scale = height / castBarHeight
+  local pipInfo = C_Texture.GetAtlasInfo(pip)
+  spark:SetTexture(pipInfo.file or pipInfo.filename)
+  spark:SetTexCoord(pipInfo.leftTexCoord, pipInfo.rightTexCoord, pipInfo.topTexCoord, pipInfo.bottomTexCoord)
+  spark:SetBlendMode("BLEND")
+  spark:SetDrawLayer("OVERLAY", 0)
+  spark:SetSize(pipSize[1] * scale, pipSize[2] * scale)
+
+  -- Above the pip, as Blizzard has it, which lights up the pip's dark edge on
+  -- the side it trails. Below the bar's text. Cut to the bar's height, which is
+  -- what Blizzard's mask leaves of it, so that it stays off a border's frame.
+  local info = C_Texture.GetAtlasInfo(entry.glow)
+  local glowHeight = math.min(glowSize[2], castBarHeight)
+  local trim = (glowSize[2] - glowHeight) / 2 / glowSize[2] * (info.bottomTexCoord - info.topTexCoord)
+  glow:SetTexture(info.file or info.filename)
+  glow:SetBlendMode("ADD")
+  glow:SetDrawLayer("OVERLAY", 1)
+  glow:SetHeight(glowHeight * scale)
+  glowArt[glow] = {
+    u0 = info.leftTexCoord, u1 = info.rightTexCoord, v0 = info.topTexCoord + trim, v1 = info.bottomTexCoord - trim,
+    width = glowSize[1] * scale,
+  }
+end
+
+-- Puts the spark x from the bar's left end, with its glow trailing to the left
+-- of it as far as the bar goes.
+--
+-- CastingBarFrame.xml lets the glow reach 2 under the pip, which ends it on a
+-- slightly darker column the pip's art has just before its bright core. On
+-- Blizzard's bar that column is a pixel, but scaled up with the bar it shows as
+-- a band where the fill seems to stop short of the pip. So here the glow reaches
+-- on to the pip's middle, the filled edge itself.
+--------------------------------------------
+function InFlight:PlaceSpark(spark, glow, x)
+--------------------------------------------
+  -- Each has the one anchor, which SetPoint moves. This runs on every update of
+  -- the bar during a flight.
+  local bar = spark:GetParent()
+  spark:SetPoint("CENTER", bar, "LEFT", x, 0)
+
+  local art = glowArt[glow]
+  glow.inflightVisible = art ~= nil and x > 0
+  if glow.inflightVisible then
+    local width = math.min(art.width, x)
+    glow:SetTexCoord(art.u1 - (art.u1 - art.u0) * width / art.width, art.u1, art.v0, art.v1)
+    glow:SetWidth(width)
+    glow:SetPoint("RIGHT", bar, "LEFT", x, 0)
+  end
+  glow:SetShown(glow.inflightVisible and spark:IsShown())
+end
+
+-- Shows or hides the spark, and its glow with it where it has one in the bar.
+-----------------------------------------------
+function InFlight:ShowSpark(spark, glow, shown)
+-----------------------------------------------
+  spark:SetShown(shown)
+  glow:SetShown(shown and glow.inflightVisible == true)
 end

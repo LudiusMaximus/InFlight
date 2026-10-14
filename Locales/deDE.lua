@@ -51,8 +51,8 @@ L["CountUp"] = "Hochzählen"
 L["CountUpTooltip"] = "Zeigt die seit dem Abflug vergangene Zeit statt der verbleibenden Zeit."
 L["FillUp"] = "Auffüllen"
 L["FillUpTooltip"] = "Füllt die Leiste im Laufe des Flugs, statt sie zu leeren."
-L["ShowSpark"] = "Funken anzeigen"
-L["ShowSparkTooltip"] = "Zeigt eine helle Markierung an der vorderen Kante der Leiste."
+L["Spark"] = "Funke"
+L["SparkTooltip"] = "Die helle Markierung an der vorderen Kante der Leiste."
 
 -- Settings menu: Text Settings
 L["TextOptions"] = "Texteinstellungen"

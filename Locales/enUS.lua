@@ -51,8 +51,8 @@ L["CountUp"] = "Count Up"
 L["CountUpTooltip"] = "Show the time that has passed since take-off instead of the time still to go."
 L["FillUp"] = "Fill Up"
 L["FillUpTooltip"] = "Fill the bar as the flight goes on instead of emptying it."
-L["ShowSpark"] = "Show Spark"
-L["ShowSparkTooltip"] = "Show a bright marker at the leading edge of the bar."
+L["Spark"] = true
+L["SparkTooltip"] = "The bright marker at the leading edge of the bar."
 
 -- Settings menu: Text Settings
 L["TextOptions"] = "Text Settings"

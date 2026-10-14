@@ -27,8 +27,8 @@ local function ToOptions(names)
 end
 
 -- Media lists go through InFlight, so that both panels offer the same ones:
--- fonts without those that duplicate another on this client, textures and
--- borders with Blizzard's from BarStyles.lua.
+-- fonts without those that duplicate another on this client, textures, borders
+-- and sparks with Blizzard's from BarStyles.lua.
 local function FontOptions()
   return ToOptions(InFlight:GetFontList())
 end
@@ -41,6 +41,10 @@ local function BorderOptions()
   return ToOptions(InFlight:GetBorderList())
 end
 
+local function SparkOptions()
+  return ToOptions(InFlight:GetSparkList())
+end
+
 -- Tries an option on the bar while the mouse rests on it, as the settings menu
 -- does too.
 local function TryOn(key)
@@ -51,7 +55,7 @@ end
 
 -- Shows the fill a colour belongs to while its picker is open, as the settings
 -- menu does too.
-local function ShowFill(key)
+local function ShowPickedFill(key)
   return function(open)
     InFlight:ShowPickedFill(key, open)
   end
@@ -225,17 +229,17 @@ function InFlight:SetupEditMode()
 
     { key = "texture", name = L["Texture"], type = "dropdown", options = TextureOptions, OnHover = TryOn("texture") },
     { key = "barcolor",     name = L["BarColor"],        type = "color",
-      colorButton = InFlight.colorButtons.barcolor,     OnPicker = ShowFill("barcolor") },
+      colorButton = InFlight.colorButtons.barcolor,     OnPicker = ShowPickedFill("barcolor") },
     { key = "unknowncolor", name = L["UnknownColor"],    type = "color", sameRow = true,
-      colorButton = InFlight.colorButtons.unknowncolor, OnPicker = ShowFill("unknowncolor") },
+      colorButton = InFlight.colorButtons.unknowncolor, OnPicker = ShowPickedFill("unknowncolor") },
     { key = "backcolor",    name = L["BackgroundColor"], type = "color",
-      colorButton = InFlight.colorButtons.backcolor,    OnPicker = ShowFill("backcolor") },
+      colorButton = InFlight.colorButtons.backcolor,    OnPicker = ShowPickedFill("backcolor") },
 
     { type = "separator" },
 
     { key = "countup", name = L["CountUp"],   type = "checkbox" },
     { key = "fill",    name = L["FillUp"],    type = "checkbox", sameRow = true },
-    { key = "spark",   name = L["ShowSpark"], type = "checkbox" },
+    { key = "spark",   name = L["Spark"],     type = "dropdown", options = SparkOptions, OnHover = TryOn("spark") },
 
     { type = "separator" },
 

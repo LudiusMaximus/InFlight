@@ -51,8 +51,8 @@ L["CountUp"] = "Compte croissant"
 L["CountUpTooltip"] = "Affiche le temps écoulé depuis le décollage au lieu du temps restant."
 L["FillUp"] = "Remplir"
 L["FillUpTooltip"] = "Remplit la barre au fil du vol au lieu de la vider."
-L["ShowSpark"] = "Montrer l'étincelle"
-L["ShowSparkTooltip"] = "Affiche un repère lumineux au bord avant de la barre."
+L["Spark"] = "Étincelle"
+L["SparkTooltip"] = "Le repère lumineux au bord avant de la barre."
 
 -- Settings menu: Text Settings
 L["TextOptions"] = "Paramètres du texte"

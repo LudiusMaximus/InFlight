@@ -1,31 +1,37 @@
 local folderName, addon = ...
 
+-- Changing a default here changes the bar of everyone who never touched that
+-- setting, so the default it replaces goes into InFlight:MigrateSettings, which
+-- writes it into every existing profile first.
 InFlight.defaults = {
   profile = {
     p = "BOTTOM",
     rp = "TOP",
     x = 0,
     y = -170,
-    countup = true,
+    countup = false,
     fill = true,
-    spark = true,
+    spark = "Classic",
     borderbg = true,
-    texture = "Blizzard",
-    width = 300,
-    height = 14,
-    border = "Blizzard Dialog",
-    barcolor = { r = 0.5, g = 0.5, b = 0.8, a = 1.0, },
-    unknowncolor = { r = 0.2, g = 0.2, b = 0.4, a = 1.0, },
-    backcolor = { r = 0.1, g = 0.1, b = 0.1, a = 0.6, },
-    bordercolor = { r = 0.6, g = 0.6, b = 0.6, a = 0.8, },
-    inline = false,
+    texture = "Blizzard Cast Bar Uninterruptible",
+    width = 500,
+    height = 28,
+    border = "Blizzard Cast Bar",
+    -- White leaves the Blizzard textures and borders the colours they are drawn
+    -- in. The background is the texture again, a shade darker and see-through.
+    barcolor = { r = 1.0, g = 1.0, b = 1.0, a = 1.0, },
+    unknowncolor = { r = 1.0, g = 1.0, b = 1.0, a = 1.0, },
+    backcolor = { r = 214 / 255, g = 214 / 255, b = 214 / 255, a = 214 / 255, },
+    bordercolor = { r = 1.0, g = 1.0, b = 1.0, a = 1.0, },
+    inline = true,
     twolines = false,
     totext = "->",
-    font = "2002 Bold",
-    fontsize = 12,
+    -- Friz Quadrata, or the font of the client's own script where it has none.
+    font = LibStub("LibSharedMedia-3.0"):GetDefault("font"),
+    fontsize = 16,
     fontcolor = { r = 1.0, g = 1.0, b = 1.0, a = 1.0, },
-    outline = false,
-    outlinetime = false,
+    outline = true,
+    outlinetime = true,
     chatlog = true,
     confirmflight = false,
     perchar = false,

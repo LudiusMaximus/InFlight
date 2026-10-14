@@ -42,15 +42,15 @@ local look     -- what the bar is drawn from, see below
 local taxiSrc, taxiSrcName, taxiDst, taxiDstName, endTime  -- location data
 local porttaken, takeoff, inworld, outworld, ontaxi        -- flags
 local ratio, endText = 0, "??"                             -- cache variables
-local sb, spark, timeText, locText, bord, back             -- frame elements
+local sb, spark, sparkGlow, timeText, locText, bord, back  -- frame elements
 local previewActive, previewRequests = nil, {}             -- dummy flight, and who wants it
 local totalTime, startTime, elapsed, throt = 0, 0, 0, 0    -- throttle variables
 local oldTakeTaxiNode
 
 -- A dropdown option tried on while the mouse rests on it, the way the barber
 -- shop tries on a choice: drawn, never stored, so nothing that saves or compares
--- settings ever sees it. The bar reads texture, border and font through Drawn
--- for that, and nothing else goes through it.
+-- settings ever sees it. The bar reads texture, border, spark and font through
+-- Drawn for that, and nothing else goes through it.
 local hovered = {}
 local function Drawn(key)
   local value = hovered[key]
@@ -296,11 +296,27 @@ local function SetPoints(f, lp, lrt, lrp, lx, ly, rp, rrt, rrp, rx, ry)
   end
 end
 
+-- The spark and the glow some sparks trail behind them go together, which
+-- BarStyles.lua sees to.
+local function ShowSpark(shown)
+  InFlight:ShowSpark(spark, sparkGlow, shown and Drawn("spark") ~= "None")
+end
+
+local function PlaceSpark(x)  -- x from the bar's left end
+  InFlight:PlaceSpark(spark, sparkGlow, x)
+end
+
+-- A colour setting as the four numbers the API takes. AceDB fills every colour
+-- in channel by channel, and a layout stores whole ones, so all four are there.
+local function RGBA(color)
+  return color.r, color.g, color.b, color.a
+end
+
 local function SetToUnknown()  -- setup bar for flights with unknown time
   sb:SetMinMaxValues(0, 1)
   sb:SetValue(1)
-  sb:SetStatusBarColor(look.unknowncolor.r, look.unknowncolor.g, look.unknowncolor.b, look.unknowncolor.a)
-  spark:Hide()
+  sb:SetStatusBarColor(RGBA(look.unknowncolor))
+  ShowSpark(false)
 end
 
 -- The client loads a font file on demand. The first SetFont for a file returns
@@ -441,15 +457,14 @@ local previewTotal, previewDone = 90, 54
 local previewSrcName, previewDstName = "Menethil Harbor", "Nethergarde Keep"
 
 local function SetToPreview()  -- fill the bar with the preview's dummy flight
-  local barcolor = look.barcolor or {r = 0.5, g = 0.5, b = 0.8, a = 1.0}
   -- The spark rides the filled edge, so it takes the bar's value rather than the
   -- elapsed time, which are the same thing only when Fill Up is on.
   local value = look.fill and previewDone or previewTotal - previewDone
   sb:SetMinMaxValues(0, previewTotal)
   sb:SetValue(value)
-  sb:SetStatusBarColor(barcolor.r, barcolor.g, barcolor.b, barcolor.a)
-  spark:SetPoint("CENTER", sb, "LEFT", look.width * value / previewTotal, 0)
-  spark:SetShown(look.spark)
+  sb:SetStatusBarColor(RGBA(look.barcolor))
+  PlaceSpark(look.width * value / previewTotal)
+  ShowSpark(true)
 end
 
 -- The unknown fill is for a flight of unknown length, unless a colour picker is
@@ -483,10 +498,9 @@ local function ShowFill()  -- the fill the bar shows now, known or unknown
     SetToPreview()
   else
     ratio = look.width / endTime
-    local barcolor = look.barcolor or {r=0.5, g=0.5, b=0.8, a=1.0}
     sb:SetMinMaxValues(0, endTime)
-    sb:SetStatusBarColor(barcolor.r or 0.5, barcolor.g or 0.5, barcolor.b or 0.8, barcolor.a or 1.0)
-    spark:SetShown(look.spark)
+    sb:SetStatusBarColor(RGBA(look.barcolor))
+    ShowSpark(true)
   end
   -- The bar may have been showing another fill, so a flight's own value and time
   -- go back on with the next update, which this makes the very next frame.
@@ -807,6 +821,89 @@ function InFlight:GetFlightTime()
   return endTime
 end
 
+-- The profile defaults each settings version replaced, the keys whose default
+-- changed and what it was before. Version 1 is everything up to 12.0.011.
+local replacedDefaults = {
+  [1] = {
+    countup = true,
+    texture = "Blizzard",
+    width = 300,
+    height = 14,
+    border = "Blizzard Dialog",
+    barcolor = { r = 0.5, g = 0.5, b = 0.8, a = 1.0, },
+    unknowncolor = { r = 0.2, g = 0.2, b = 0.4, a = 1.0, },
+    backcolor = { r = 0.1, g = 0.1, b = 0.1, a = 0.6, },
+    bordercolor = { r = 0.6, g = 0.6, b = 0.6, a = 0.8, },
+    inline = false,
+    totext = " >--In Route To--> ",
+    font = "2002 Bold",  -- outside Russian clients replaced, see RepairFont
+    fontsize = 12,
+    outline = false,
+    outlinetime = false,
+  },
+}
+local settingsVersion = #replacedDefaults + 1
+
+-- AceDB leaves out of the saved variables every value that matches its default,
+-- so a value missing from a profile stands for whatever the default was when it
+-- was saved. A changed default would therefore change the bar of everyone who
+-- never touched that setting. So every existing profile first gets the defaults
+-- it was saved under written in as its own values, and settingsVersion records
+-- which defaults the profiles have been brought past.
+--
+-- This has to run before AceDB fills the new defaults in, because until then an
+-- absent value can only mean the old default. AceDB strips a colour channel by
+-- channel, so a colour can be stored in part, and its missing channels are
+-- filled in the same way. Values that match the new defaults are left out again
+-- at logout, as usual.
+--
+-- A fresh install never had the old defaults, and neither has a profile made
+-- from now on, so only the profiles there are now are brought along.
+-----------------------------------------------
+function InFlight:MigrateSettings(freshInstall)
+-----------------------------------------------
+  if freshInstall then
+    InFlightDB.settingsVersion = settingsVersion
+  end
+
+  -- A profile that only ever held defaults may never have been saved at all.
+  -- It was on the old defaults all the same.
+  local profiles = InFlightDB.profiles or {}
+  InFlightDB.profiles = profiles
+  if (InFlightDB.settingsVersion or 1) < settingsVersion then
+    profiles.Default = profiles.Default or {}
+    for _, name in pairs(InFlightDB.profileKeys or {}) do
+      profiles[name] = profiles[name] or {}
+    end
+  end
+
+  for version = InFlightDB.settingsVersion or 1, settingsVersion - 1 do
+    for _, savedProfile in pairs(profiles) do
+      for key, old in pairs(replacedDefaults[version]) do
+        local saved = savedProfile[key]
+        if type(old) == "table" then
+          if type(saved) ~= "table" then
+            saved = {}
+            savedProfile[key] = saved
+          end
+          for channel, value in pairs(old) do
+            if saved[channel] == nil then
+              saved[channel] = value
+            end
+          end
+        -- Builds made while the "to" text was on its way to its new default
+        -- already wrote the old one in, and left this flag behind.
+        elseif saved == nil and not (key == "totext" and InFlightDB.totextMigrated) then
+          savedProfile[key] = old
+        end
+      end
+    end
+  end
+
+  InFlightDB.settingsVersion = settingsVersion
+  InFlightDB.totextMigrated = nil
+end
+
 ----------------------------
 function InFlight:LoadBulk()
 ----------------------------
@@ -959,28 +1056,7 @@ function InFlight:LoadBulk()
     self.defaults.global[playerFaction == "Alliance" and "Horde" or "Alliance"] = nil
   end
 
-  -- The "to" text used to default to the long string below. Every place the bar
-  -- draws it already puts spaces around it, so that default carried spaces of its
-  -- own, and the popup capped input at fewer letters than the default itself used.
-  -- It is "->" now, which reads the same in every locale. Anyone who was on the old
-  -- default keeps the old text, written out as their own so that nothing about
-  -- their bar changes.
-  --
-  -- This has to run before AceDB fills the new default in, because an absent value
-  -- can only be read as "was on the old default" until that happens. The flag can
-  -- go, with this whole block, a few versions from now.
-  --
-  -- A fresh install never had the old default, so it gets the new one.
-  if not InFlightDB.totextMigrated then
-    InFlightDB.totextMigrated = true
-    if not freshInstall then
-      for _, savedProfile in pairs(InFlightDB.profiles or {}) do
-        if savedProfile.totext == nil then
-          savedProfile.totext = " >--In Route To--> "
-        end
-      end
-    end
-  end
+  self:MigrateSettings(freshInstall)
 
   -- Create self.db SavedVariables InFlightDB with Inflight.defaults as defaults.
   self.db = LibStub("AceDB-3.0"):New("InFlightDB", self.defaults, true)
@@ -1011,21 +1087,48 @@ function InFlight:LoadBulk()
     end
   end
 
+  -- The spark used to be on or off, before there was more than one to pick.
+  local function RepairSpark(t)
+    if type(t) == "table" and type(t.spark) == "boolean" then
+      t.spark = t.spark and "Classic" or "None"
+    end
+  end
+
+  -- "2002 Bold", the old default font, is left out of the font list on western
+  -- clients, where it draws the same as Friz Quadrata. Korean and Chinese
+  -- clients have no font of that name at all: LibSharedMedia registers it only
+  -- for western and Russian ones, so there it has always drawn as the client's
+  -- default font. Either way a bar set to it gets the client's default instead,
+  -- Friz Quadrata on a western client. It looks no different, and the font
+  -- lists then have it selected. Only on a Russian client is it a font of its
+  -- own, and kept.
+  local function RepairFont(t)
+    if type(t) == "table" and t.font == "2002 Bold" and GetLocale() ~= "ruRU" then
+      t.font = smed:GetDefault("font")
+    end
+  end
+
+  local function Repair(t)
+    RepairMediaKeys(t)
+    RepairSpark(t)
+    RepairFont(t)
+  end
+
   -- The profile in use, whichever table that turns out to be, and then every
   -- stored one so that switching profiles does not bring the problem back.
-  RepairMediaKeys(profile)
+  Repair(profile)
   if InFlightDB.profiles then
     for _, savedProfile in pairs(InFlightDB.profiles) do
-      RepairMediaKeys(savedProfile)
+      Repair(savedProfile)
     end
   end
 
   -- Every edit mode layout holds its own copy of these settings and lays them
   -- over the profile whenever the layout is applied, so repairing only the
-  -- profile would leave the number to come back through the override.
+  -- profile would leave the old value to come back through the override.
   if InFlightDB.editModeLayouts then
     for _, layout in pairs(InFlightDB.editModeLayouts) do
-      RepairMediaKeys(layout.settings)
+      Repair(layout.settings)
     end
   end
 
@@ -1211,7 +1314,7 @@ function InFlight:StartTimer(slot)  -- lift off
   if endTime then
     sb:SetMinMaxValues(0, endTime)
     sb:SetValue(look.fill and 0 or endTime)
-    spark:SetPoint("CENTER", sb, "LEFT", look.fill and 0 or look.width, 0)
+    PlaceSpark(look.fill and 0 or look.width)
   else
     SetToUnknown()
   end
@@ -1405,14 +1508,17 @@ do  -- timer bar
     end)
     sb:SetScript("OnLeave", function() gtt:Hide() end)
 
+    -- Above the spark and its glow, which are OVERLAY at sublevels 0 and 1.
     timeText = sb:CreateFontString(nil, "OVERLAY")
+    timeText:SetDrawLayer("OVERLAY", 2)
     locText = sb:CreateFontString(nil, "OVERLAY")
+    locText:SetDrawLayer("OVERLAY", 2)
 
+    -- Their art is set by UpdateLook, from the spark picked.
     spark = sb:CreateTexture(nil, "OVERLAY")
     spark:Hide()
-    spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
-    spark:SetWidth(16)
-    spark:SetBlendMode("ADD")
+    sparkGlow = sb:CreateTexture()
+    sparkGlow:Hide()
 
     bord = CreateFrame("Frame", nil, sb, BackdropTemplateMixin and "BackdropTemplate")  -- LibSharedMedia border
     SetPoints(bord, "TOPLEFT", sb, "TOPLEFT", -5, 5, "BOTTOMRIGHT", sb, "BOTTOMRIGHT", 5, -5)
@@ -1546,7 +1652,7 @@ do  -- timer bar
           if not ShowsUnknown() then
             local value = look.fill and curTime or (endTime - curTime)
             sb:SetValue(value)
-            spark:SetPoint("CENTER", sb, "LEFT", value * ratio, 0)
+            PlaceSpark(value * ratio)
           end
 
           ShowTime(curTime, endTime, endText)
@@ -1617,9 +1723,6 @@ do  -- timer bar
     sb:SetWidth(look.width)
     sb:SetHeight(look.height)
 
-    local backcolor = look.backcolor or {r=0.1, g=0.1, b=0.1, a=0.6}
-    local bordercolor = look.bordercolor or {r=0.6, g=0.6, b=0.6, a=0.8}
-
     -- The texture is a LibSharedMedia file or one of Blizzard's atlases from
     -- BarStyles.lua. An atlas leaves its own texture coordinates behind, so a
     -- file has to put the whole texture back.
@@ -1630,7 +1733,7 @@ do  -- timer bar
       back:SetTexture(texture)
       back:SetTexCoord(0, 1, 0, 1)
     end
-    back:SetVertexColor(backcolor.r or 0.1, backcolor.g or 0.1, backcolor.b or 0.1, backcolor.a or 0.6)
+    back:SetVertexColor(RGBA(look.backcolor))
 
     -- A border of Blizzard's art is drawn by BarStyles.lua, which says how far
     -- above the bar it reaches, whether it drew a background of its own, how far
@@ -1640,12 +1743,12 @@ do  -- timer bar
     -- BarStyles.lua gives it.
     local border = Drawn("border")
     local borderTop, ownBackground, borderInset, borderOffsetY =
-      self:DrawBarBorder(sb, border, bordercolor, backcolor, look.borderbg)
+      self:DrawBarBorder(sb, border, look.bordercolor, look.backcolor, look.borderbg)
     if borderTop then
       bord:SetBackdrop(nil)
     else
       bord:SetBackdrop({ edgeFile = smed:Fetch("border", border), edgeSize = 16 })
-      bord:SetBackdropBorderColor(bordercolor.r or 0.6, bordercolor.g or 0.6, bordercolor.b or 0.6, bordercolor.a or 0.8)
+      bord:SetBackdropBorderColor(RGBA(look.bordercolor))
       borderTop = border == "None" and 0 or 2
       borderInset, borderOffsetY = self:MediaBorderTextOffsets(border)
     end
@@ -1657,20 +1760,16 @@ do  -- timer bar
       sb:GetStatusBarTexture():SetVertTile(false)
     end
 
-    spark:SetHeight(look.height * 2.4)
+    self:StyleSpark(spark, sparkGlow, Drawn("spark"), look.height)
     ShowFill()
-
-    local fontcolor = look.fontcolor or {r=1.0, g=1.0, b=1.0, a=1.0}
 
     ApplyBarFontsWithRetry()
 
-    locText:SetShadowColor(0, 0, 0, fontcolor.a or 1.0)
-    locText:SetShadowOffset(1, -1)
-    locText:SetTextColor(fontcolor.r or 1.0, fontcolor.g or 1.0, fontcolor.b or 1.0, fontcolor.a or 1.0)
-
-    timeText:SetShadowColor(0, 0, 0, fontcolor.a or 1.0)
-    timeText:SetShadowOffset(1, -1)
-    timeText:SetTextColor(fontcolor.r or 1.0, fontcolor.g or 1.0, fontcolor.b or 1.0, fontcolor.a or 1.0)
+    for _, text in ipairs({ locText, timeText }) do
+      text:SetShadowColor(0, 0, 0, look.fontcolor.a)
+      text:SetShadowOffset(1, -1)
+      text:SetTextColor(RGBA(look.fontcolor))
+    end
 
     -- The preview shows names of its own rather than writing them into the
     -- flight's variables, which a flight master opened during the preview would
@@ -1949,7 +2048,7 @@ end
 InFlight.tooltips = {
   countup      = L["CountUpTooltip"],
   fill         = L["FillUpTooltip"],
-  spark        = L["ShowSparkTooltip"],
+  spark        = L["SparkTooltip"],
   height       = L["HeightTooltip"],
   width        = L["WidthTooltip"],
   texture      = L["TextureTooltip"],
@@ -1990,7 +2089,7 @@ InFlight.colorButtons = {
 -- opens. Where the menu stood and which submenu was open is kept here, and the
 -- menu comes back like that once the picker is done with, whether by OK or by
 -- Cancel.
-local reopenMenu, pickerHooked
+local reopenMenu
 
 --------------------------------
 function InFlight.ShowSettings()
@@ -2187,22 +2286,18 @@ function InFlight.ShowSettings()
     if not colorTable then return end
 
     -- Through the library, so that the picker is the one the layout editor
-    -- shows, White button included.
+    -- shows, White button included. Its going is also when the menu comes back.
     LLS:ShowColorPicker({
       color = colorTable,
       colorButton = InFlight.colorButtons[colorKey],
       OnPick = function(r, g, b, a) SetColor(colorKey, r, g, b, a) end,
-      OnPicker = function(open) InFlight:ShowPickedFill(colorKey, open) end,
-    })
-
-    if not pickerHooked then
-      pickerHooked = true
-      ColorPickerFrame:HookScript("OnHide", function()
-        if reopenMenu then
+      OnPicker = function(open)
+        InFlight:ShowPickedFill(colorKey, open)
+        if not open and reopenMenu then
           InFlight.ShowSettings()
         end
-      end)
-    end
+      end,
+    })
   end
 
   -- Helper: A color swatch for one setting, carrying the same tooltip the layout
@@ -2420,7 +2515,8 @@ function InFlight.ShowSettings()
     -- How the bar behaves during a flight.
     AddCheckbox(barMenu, L["CountUp"], "countup")
     AddCheckbox(barMenu, L["FillUp"], "fill")
-    AddCheckbox(barMenu, L["ShowSpark"], "spark")
+    local sparkList = InFlight:GetSparkList()
+    AddFakeSliderSubmenu(barMenu, L["Spark"], "spark", 1, #sparkList, 1, sparkList)
 
     -- ===== TEXT OPTIONS =====
     local textMenu = mainMenu:CreateButton(L["TextOptions"])
