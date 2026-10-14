@@ -1946,23 +1946,70 @@ function InFlight:ProfileChanged()  -- another set of the user's own settings is
 end
 
 
+-- The bar's position, which Reset to Defaults leaves alone. Reset Position is
+-- there for that.
+InFlight.positionKeys = { p = true, rp = true, x = true, y = true }
+
+-- Whether a value is the default for its key, a colour channel by channel.
+--------------------------------------------
+function InFlight:IsDefaultValue(key, value)
+--------------------------------------------
+  local default = self.defaults.profile[key]
+  if type(default) ~= "table" then
+    return value == default
+  end
+  if type(value) ~= "table" then
+    return false
+  end
+  for channel, defaultChannel in pairs(default) do
+    if value[channel] ~= defaultChannel then
+      return false
+    end
+  end
+  return true
+end
+
 -----------------------------------
 function InFlight:ResetToDefaults()
 -----------------------------------
   -- Resets whatever the settings are editing right now: the active layout's own
   -- settings, or the user's own, which are account wide or character specific
   -- depending on the other checkbox. Shared by the settings menu, the settings
-  -- page and the layout editor, which all edit the same thing.
+  -- page and the layout editor, which all edit the same thing. The position is
+  -- kept.
   if self:IsLayoutSpecific() then
     self:ResetLayoutToDefaults()
     return
   end
 
+  local position = {}
+  for key in pairs(self.positionKeys) do
+    position[key] = self.db.profile[key]
+  end
   self.db:ResetProfile()
+  for key, value in pairs(position) do
+    self.db.profile[key] = value
+  end
   if self.db:GetCurrentProfile() ~= "Default" then
     self.db.profile.perchar = true
   end
   self:ProfileChanged()
+end
+
+-- Whether Reset to Defaults would change nothing, so that it can be greyed out
+-- the way Reset Position is.
+--------------------------------
+function InFlight:IsAtDefaults()
+--------------------------------
+  if self:IsLayoutSpecific() then
+    return self:LayoutIsAtDefaults()
+  end
+  for key in pairs(self.defaults.profile) do
+    if not self.positionKeys[key] and key ~= "perchar" and not self:IsDefaultValue(key, self.db.profile[key]) then
+      return false
+    end
+  end
+  return true
 end
 
 
@@ -2564,9 +2611,11 @@ function InFlight.ShowSettings()
 
     otherMenu:CreateDivider()
 
-    otherMenu:CreateButton(L["ResetToDefaults"], function()
+    local resetToDefaults = otherMenu:CreateButton(L["ResetToDefaults"], function()
       InFlight:ResetToDefaults()
-    end):SetTitleAndTextTooltip(L["ResetToDefaults"], L["ResetToDefaultsTooltip"])
+    end)
+    resetToDefaults:SetEnabled(function() return not InFlight:IsAtDefaults() end)
+    resetToDefaults:SetTitleAndTextTooltip(L["ResetToDefaults"], L["ResetToDefaultsTooltip"])
 
     otherMenu:CreateDivider()
 

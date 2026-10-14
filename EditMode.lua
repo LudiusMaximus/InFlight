@@ -112,9 +112,10 @@ end
 -----------------------------------------
 function InFlight:ResetLayoutToDefaults()
 -----------------------------------------
-  -- Puts this layout's own settings back to the defaults in Defaults.lua. The
-  -- user's own settings are not touched: this layout is what the settings menu is
-  -- editing while it is layout specific, so this layout is what resets.
+  -- Puts this layout's own settings back to the defaults in Defaults.lua, all but
+  -- its position. The user's own settings are not touched: this layout is what
+  -- the settings menu is editing while it is layout specific, so this layout is
+  -- what resets.
   if not layoutKeys then
     return
   end
@@ -122,14 +123,26 @@ function InFlight:ResetLayoutToDefaults()
   local defaults = self.defaults.profile
   for _, key in ipairs(layoutKeys) do
     local value = defaults[key]
-    if value ~= nil then
+    if value ~= nil and not self.positionKeys[key] then
       self:SetLookOverride(key, type(value) == "table" and CopyTable(value) or value)
     end
   end
 
-  self:ApplyBarPosition()
   self:UpdateLook()
   self:CaptureEditModeLayout()
+end
+
+
+--------------------------------------
+function InFlight:LayoutIsAtDefaults()
+--------------------------------------
+  -- Whether resetting this layout would change nothing.
+  for _, key in ipairs(layoutKeys or {}) do
+    if not self.positionKeys[key] and not self:IsDefaultValue(key, self:GetLook(key)) then
+      return false
+    end
+  end
+  return true
 end
 
 
@@ -262,9 +275,12 @@ function InFlight:SetupEditMode()
     { type = "resetPosition", tooltip = L["ResetPositionTooltip"] },
 
     -- The same reset the settings menu offers, which while a layout owns the bar
-    -- is this layout's reset. Position included, so this is the wider of the two.
+    -- is this layout's reset. Everything but the position, which the button
+    -- beside it resets, and greyed out like that one while there is nothing to
+    -- reset.
     { type = "button", text = L["ResetToDefaults"], tooltip = L["ResetToDefaultsTooltip"],
       sameRow = true,
+      IsDisabled = function() return InFlight:IsAtDefaults() end,
       OnClick = function()
         InFlight:ResetToDefaults()
       end },
