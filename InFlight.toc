@@ -4,17 +4,17 @@
 ## IconAtlas: Taxi_Frame_Yellow
 ## Author: TotalPackage, Deranjata, LudiusMaximus
 
-## Notes: Status bar timer for your flight paths.
-## Notes-deDE: Zeitanzeigeleiste für Flugrouten.
-## Notes-esES: Temporizador barra de estado para sus rutas de vuelo.
-## Notes-esMX: Temporizador barra de estado para sus rutas de vuelo.
-## Notes-frFR: Minuterie de barre d'état pour vos trajectoires de vol.
-## Notes-itIT: Timer della barra di stato per le tue traiettorie di volo.
-## Notes-koKR: 비행 경로에 대한 상태 표시 줄 타이머.
-## Notes-ptBR: Temporizador da barra de status para suas rotas de voo.
-## Notes-ruRU: Таймер строки состояния для Ваших маршрутов полета.
-## Notes-zhCN: 您的航班路径的状态栏计时器。
-## Notes-zhTW: 您的航班路徑的狀態欄計時器。
+## Notes: A timer bar for your flights, and their flight times on the flight map.
+## Notes-deDE: Eine Zeitleiste für deine Flüge und ihre Flugzeiten auf der Flugkarte.
+## Notes-esES: Una barra de tiempo para tus vuelos y su duración en el mapa de vuelo.
+## Notes-esMX: Una barra de tiempo para tus vuelos y su duración en el mapa de vuelo.
+## Notes-frFR: Une barre de temps pour vos vols, et leur durée sur la carte des trajets aériens.
+## Notes-itIT: Una barra del tempo per i tuoi voli e la loro durata sulla mappa dei voli.
+## Notes-koKR: 비행 중 시간 바를 보여 주고, 비행 지도에 비행 시간을 표시합니다.
+## Notes-ptBR: Uma barra de tempo para seus voos e a duração deles no mapa de voo.
+## Notes-ruRU: Полоса времени для ваших полетов и их продолжительность на карте полетов.
+## Notes-zhCN: 飞行时显示时间条，并在飞行地图上显示飞行时长。
+## Notes-zhTW: 飛行時顯示時間條，並在飛行地圖上顯示飛行時間。
 
 ## Category: Other
 ## Category-deDE: Anderes

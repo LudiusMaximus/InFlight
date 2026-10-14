@@ -163,10 +163,19 @@ function InFlight:CopyLookFromProfile(profileName)
 
   for _, key in ipairs(layoutKeys) do
     -- AceDB strips default valued keys out of every profile but the one in use,
-    -- so an absent key means the profile is content with the default.
+    -- so an absent key means the profile is content with the default. It strips
+    -- a colour channel by channel, so a colour comes back whole only with the
+    -- default's channels filled in, and as a table of its own.
     local value = stored and stored[key]
-    if value == nil then
-      value = defaults[key]
+    local default = defaults[key]
+    if type(default) == "table" then
+      local color = {}
+      for channel, defaultChannel in pairs(default) do
+        color[channel] = type(value) == "table" and value[channel] or defaultChannel
+      end
+      value = color
+    elseif value == nil then
+      value = default
     end
     if value ~= nil then
       self:SetLook(key, value)

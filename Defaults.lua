@@ -5,17 +5,17 @@ local folderName, addon = ...
 -- writes it into every existing profile first.
 InFlight.defaults = {
   profile = {
-    p = "BOTTOM",
+    p = "TOP",
     rp = "TOP",
     x = 0,
-    y = -170,
+    y = -36,
     countup = false,
     fill = true,
     spark = "Classic",
     borderbg = true,
     texture = "Blizzard Cast Bar Uninterruptible",
-    width = 500,
-    height = 28,
+    width = 375,
+    height = 21,
     border = "Blizzard Cast Bar",
     -- White leaves the Blizzard textures and borders the colours they are drawn
     -- in. The background is the texture again, a shade darker and see-through.
@@ -28,7 +28,7 @@ InFlight.defaults = {
     totext = "->",
     -- Friz Quadrata, or the font of the client's own script where it has none.
     font = LibStub("LibSharedMedia-3.0"):GetDefault("font"),
-    fontsize = 16,
+    fontsize = 14,
     fontcolor = { r = 1.0, g = 1.0, b = 1.0, a = 1.0, },
     outline = true,
     outlinetime = true,

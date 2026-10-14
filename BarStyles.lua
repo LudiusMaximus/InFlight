@@ -88,7 +88,7 @@ local borders = {
   -- rims instead, rows 28 to 36, the rims above and below overlapping it by 2.
   -- Across, the side rims end at columns 34 and 222 and the bar meets them. The
   -- box is where the file actually draws.
-  { name = "Blizzard Classic Cast Bar", height = 13,
+  { name = "Blizzard Classic Cast Bar", height = 13, textOffsetY = 0.75,
     { file = [[Interface\CastingBar\UI-CastingBar-Border]], box = {22, 16, 234, 48, 256, 64},
       caps = {16, 16}, outset = {12, 10, 12, 9} } },
 
@@ -491,6 +491,11 @@ end
 -- cut to the bar's height and off at its left end instead, which every client
 -- can do.
 --
+-- The Classic clients have the pip but none of the glows. Their own modern cast
+-- bar, Blizzard_NamePlateCastingBar.lua's for nameplates, draws the pip alone,
+-- added onto the fill rather than laid over it, and so does Casting there.
+-- Crafting is only Casting with another glow, and is not offered without it.
+--
 -- Left out: the shadow CastingBarFrame.lua trails behind the pip of a channel,
 -- cast_channel_pipshadow, which did not look good even on the Cast Bar Channel
 -- texture it belongs with.
@@ -498,7 +503,7 @@ local pip, pipSize, castBarHeight = "ui-castingbar-pip", { 8, 20 }, 11
 local glowSize = { 37, 12 }
 
 local sparks = {
-  { name = "Casting",  glow = "cast_standard_pipglow" },
+  { name = "Casting",  glow = "cast_standard_pipglow", pipAlone = true },
   { name = "Crafting", glow = "cast_crafting_pipglow" },
   { name = "Classic",  file = [[Interface\CastingBar\UI-CastingBar-Spark]] },
 }
@@ -510,7 +515,7 @@ for _, entry in ipairs(sparks) do
 end
 
 local function SparkExists(entry)
-  return entry.file ~= nil or (AtlasExists(pip) and AtlasExists(entry.glow))
+  return entry.file ~= nil or (AtlasExists(pip) and (entry.pipAlone or AtlasExists(entry.glow)))
 end
 
 -- The sparks on offer on this client, and last none at all.
@@ -531,6 +536,12 @@ end
 -- Nil for no glow.
 local glowArt = {}
 
+local function NoGlow(glow)
+  glowArt[glow] = nil
+  glow.inflightVisible = false
+  glow:Hide()
+end
+
 -- Gives the spark and its glow the look of the spark of that name, at the bar's
 -- height. A name this client has no art for gets the classic spark. Placing them
 -- is PlaceSpark's.
@@ -548,9 +559,7 @@ function InFlight:StyleSpark(spark, glow, name, height)
     spark:SetBlendMode("ADD")
     spark:SetDrawLayer("OVERLAY", 0)
     spark:SetSize(16, height * 2.4)
-    glowArt[glow] = nil
-    glow.inflightVisible = false
-    glow:Hide()
+    NoGlow(glow)
     return
   end
 
@@ -560,9 +569,15 @@ function InFlight:StyleSpark(spark, glow, name, height)
   local pipInfo = C_Texture.GetAtlasInfo(pip)
   spark:SetTexture(pipInfo.file or pipInfo.filename)
   spark:SetTexCoord(pipInfo.leftTexCoord, pipInfo.rightTexCoord, pipInfo.topTexCoord, pipInfo.bottomTexCoord)
-  spark:SetBlendMode("BLEND")
   spark:SetDrawLayer("OVERLAY", 0)
   spark:SetSize(pipSize[1] * scale, pipSize[2] * scale)
+
+  if not AtlasExists(entry.glow) then
+    spark:SetBlendMode("ADD")
+    NoGlow(glow)
+    return
+  end
+  spark:SetBlendMode("BLEND")
 
   -- Above the pip, as Blizzard has it, which lights up the pip's dark edge on
   -- the side it trails. Below the bar's text. Cut to the bar's height, which is

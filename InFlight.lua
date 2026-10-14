@@ -25,10 +25,8 @@ local smed = LibStub("LibSharedMedia-3.0")
 local LLS = LibStub("LibLayoutSettings-1.0")
 
 -- LOCALIZATION
-local L = LibStub("AceLocale-3.0"):GetLocale("InFlight", not debug)
+local L = LibStub("AceLocale-3.0"):GetLocale("InFlight")
 InFlight.L = L
-
-
 
 InFlight.newPlayerSaveData = {}
 
@@ -420,15 +418,28 @@ local function ApplyBarFontsWithRetry()
 end
 
 -- LibSharedMedia offers the client's Korean and Chinese font files to western
--- clients as well, on the strength of a glyph coverage check made in 2012. They
--- no longer earn their place. Measured at size 16 on 12.1.0, "2002 Bold" renders
--- latin and digits pixel identical to Friz Quadrata, "2002" differs only by a
--- third of a pixel per digit, and the three AR files share one latin set between
--- them. Their own scripts do render, but a western client never asks for them.
+-- clients as well, on the strength of a glyph coverage check made in 2012. Their
+-- own scripts do render, but a western client never asks for them, and their
+-- latin letters mostly repeat one another. Measured at size 16 on 12.1.0, "2002
+-- Bold" renders latin and digits pixel identical to Friz Quadrata, "2002"
+-- differs only by a third of a pixel per digit, and the three AR files share one
+-- latin set between them, a narrow one of their own. So a western client is
+-- offered Friz Quadrata and one AR file for those, and a bar set to one of the
+-- others gets the one it looks like, see InFlight:ReplacedFont.
 --
 -- Other locales keep the full list, because there these files are the point, and
 -- fonts registered by other addons are never touched.
-local redundantWesternFonts = {
+local westernFontReplacements = {
+  ["2002"] = "Friz Quadrata TT",
+  ["2002 Bold"] = "Friz Quadrata TT",
+  ["AR CrystalzcuheiGBK Demibold"] = "AR ZhongkaiGBK Medium",
+  ["AR ZhongkaiGBK Medium (Combat)"] = "AR ZhongkaiGBK Medium",
+}
+
+-- LibSharedMedia registers these for western and Russian clients only, so on a
+-- Korean or Chinese one a bar set to one of them has always drawn in the
+-- client's default font.
+local westernAndRussianFonts = {
   ["2002"] = true,
   ["2002 Bold"] = true,
   ["AR CrystalzcuheiGBK Demibold"] = true,
@@ -438,20 +449,53 @@ local redundantWesternFonts = {
 
 local nonWesternLocales = { koKR = true, zhCN = true, zhTW = true, ruRU = true }
 
+-- The font a bar set to this one gets instead on this client, so that it looks
+-- the same and the font lists have it selected. Nil to keep it, which a Russian
+-- client always does, these being fonts of their own there.
+------------------------------------
+function InFlight:ReplacedFont(name)
+------------------------------------
+  local locale = GetLocale()
+  if locale == "ruRU" then
+    return nil
+  elseif nonWesternLocales[locale] then
+    return westernAndRussianFonts[name] and smed:GetDefault("font") or nil
+  end
+  return westernFontReplacements[name]
+end
+
+-- The order the font lists offer them in. Any other, another addon's or one of a
+-- Korean, Chinese or Russian client's own, follows by name.
+local fontOrder = {
+  "Arial Narrow", "AR ZhongkaiGBK Medium", "Friz Quadrata TT", "Nimrod MT", "MoK", "Skurri", "Morpheus",
+}
+local fontPosition = {}
+for i, name in ipairs(fontOrder) do
+  fontPosition[name] = i
+end
+
+local function FontSorter(a, b)
+  local i, j = fontPosition[a], fontPosition[b]
+  if i and j then
+    return i < j
+  elseif i or j then
+    return i ~= nil
+  end
+  return a:lower() < b:lower()
+end
+
 -------------------------------
 function InFlight:GetFontList()  -- the fonts worth offering on this client
 -------------------------------
-  local fonts = smed:List("font")
-  if nonWesternLocales[GetLocale()] then
-    return fonts
-  end
-
+  -- A copy, as LibSharedMedia's own list is not ours to sort.
+  local western = not nonWesternLocales[GetLocale()]
   local offered = {}
-  for _, name in ipairs(fonts) do
-    if not redundantWesternFonts[name] then
+  for _, name in ipairs(smed:List("font")) do
+    if not (western and westernFontReplacements[name]) then
       offered[#offered + 1] = name
     end
   end
+  table.sort(offered, FontSorter)
   return offered
 end
 
@@ -465,10 +509,10 @@ local fontOffsets = {
   ["2002"] = 0,
   ["2002 Bold"] = 0,
   ["AR CrystalzcuheiGBK Demibold"] = 0,
-  ["AR ZhongkaiGBK Medium"] = 0,
-  ["AR ZhongkaiGBK Medium (Combat)"] = 0,
+  ["AR ZhongkaiGBK Medium"] = 0.05,
+  ["AR ZhongkaiGBK Medium (Combat)"] = 0.05,
   ["Arial Narrow"] = -0.05,
-  ["Friz Quadrata TT"] = -0.075,
+  ["Friz Quadrata TT"] = -0.05,
   ["MoK"] = 0,
   ["Morpheus"] = 0,
   ["Nimrod MT"] = -0.05,
@@ -649,10 +693,8 @@ local function postFlightNodeOnButtonEnter(button) -- adds duration info to flig
   local tmpTaxiDst = button.taxiNodeData.nodeID
   local duration = dstNodes and dstNodes[tmpTaxiDst]
   if duration then
-    -- gtt:AddLine("NodeID: "..button.taxiNodeData.nodeID, 0.2, 0.8, 0.2) -- TEST
     addDuration(duration * InFlight:KhazAlgarFlightMasterFactor(tmpTaxiDst) * InFlight:RideLikeTheWindFactor())
   else
-    -- gtt:AddLine("NodeID: "..button.taxiNodeData.nodeID, 0.2, 0.8, 0.2) -- TEST
     addDuration(GetEstimatedTime(button.taxiNodeData.slotIndex) or 0, true)
   end
 end
@@ -664,11 +706,7 @@ function InFlight:SetupInFlight()
   SlashCmdList.INFLIGHT = function(arg1)
 
     if arg1 == "export" then
-      if PTR_IssueReporter == nil then
-        self:ExportDB()
-      else
-        print("Only exporting from the live game client. PTR has been unreliable before.")
-      end
+      self:ExportFlightTimes()
     else
       self:ShowSettings()
     end
@@ -678,14 +716,15 @@ function InFlight:SetupInFlight()
 
 
   -- The addon settings panel. It scrolls, because with the bar's settings on it
-  -- the page is taller than the settings window.
+  -- the page is taller than the settings window, with the settings window's own
+  -- scroll bar, which ScrollFrameTemplate would not give the Classic clients.
   local panel = CreateFrame("Frame")
   -- Hidden until the settings window shows it. It only calls Show, which does
   -- nothing to a frame that is already shown, so OnShow would never run the
   -- first time the page is opened.
   panel:Hide()
 
-  local scroll = CreateFrame("ScrollFrame", nil, panel, "ScrollFrameTemplate")
+  local scroll = LLS:CreateScrollFrame(panel)
   scroll:SetPoint("TOPLEFT", 0, -4)
   scroll:SetPoint("BOTTOMRIGHT", -28, 4)
   local content = CreateFrame("Frame", nil, scroll)
@@ -708,25 +747,26 @@ function InFlight:SetupInFlight()
   local function GetInfo(field)
     return C_AddOns.GetAddOnMetadata("InFlight", field) or "N/A"
   end
-  t2:SetFormattedText("|cff00aaffAuthor:|r %s\n|cff00aaffVersion:|r %s\n\n%s|r", GetInfo("Author"), GetInfo("Version"), GetInfo("Notes"))
+  t2:SetFormattedText("|cff00aaffVersion:|r %s\n\n%s|r", GetInfo("Version"), GetInfo("Notes"))
 
   -- The settings menu, the same one right-clicking the bar opens.
+  -- These two are sized and placed like the button rows below them, in the
+  -- rows' two columns, the first of which starts under the text above.
+  local firstColumn, secondColumn, buttonWidth, buttonHeight = LLS:GetButtonLayout()
+
   local menuButton = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
   menuButton:SetText(L["Menu"])
-  menuButton:SetWidth(max(120, menuButton:GetTextWidth() + 20))
+  menuButton:SetSize(buttonWidth, buttonHeight)
   menuButton:SetScript("OnClick", InFlight.ShowSettings)
-  menuButton:SetPoint("TOPLEFT", t2, "BOTTOMLEFT", -2, -8)
+  menuButton:SetPoint("TOPLEFT", t2, "BOTTOMLEFT", 0, -8)
 
   -- A made-up flight on the bar, to see the settings without flying anywhere.
   -- Greyed out while a real flight is on the bar, which shows them already.
   local previewButton = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-  previewButton:SetPoint("LEFT", menuButton, "RIGHT", 8, 0)
+  previewButton:SetPoint("LEFT", menuButton, "LEFT", secondColumn - firstColumn, 0)
   previewButton:SetMotionScriptsWhileDisabled(true)
-  -- Wide enough for either label, so that it does not change size when clicked.
-  previewButton:SetText(L["HidePreview"])
-  local labelWidth = previewButton:GetTextWidth()
+  previewButton:SetSize(buttonWidth, buttonHeight)
   previewButton:SetText(L["ShowPreview"])
-  previewButton:SetWidth(max(120, labelWidth + 20, previewButton:GetTextWidth() + 20))
 
   local function RefreshPreviewButton()
     previewButton:SetEnabled(not InFlight:IsShown())
@@ -759,9 +799,9 @@ function InFlight:SetupInFlight()
   -- the bar. They change whatever the settings menu changes, and their Revert
   -- Changes goes back to how the bar looked when the page was opened. Drawn when
   -- the page is first opened, because the edit mode registration needs the saved
-  -- variables. The library places its rows 26 in from its frame's left edge and
-  -- the buttons sit 2 left of the text above them, hence the offset that lines
-  -- the row labels up with that text.
+  -- variables. The rows' first column starts firstColumn in from their frame's
+  -- left edge, so the frame goes that far left of the buttons, which start under
+  -- the text above.
   local rows, divider
 
   -- The scroll range has to reach the last thing shown, which is only laid out
@@ -797,7 +837,7 @@ function InFlight:SetupInFlight()
       rows = InFlight:CreateSettingsRows(content, panel)
       if rows then
         -- 32 down leaves the divider 16 and 8 either side of it.
-        rows:SetPoint("TOPLEFT", menuButton, "BOTTOMLEFT", 2 - 26, -32)
+        rows:SetPoint("TOPLEFT", menuButton, "BOTTOMLEFT", -firstColumn, -32)
 
         -- The divider the library draws between rows, centred over them the
         -- way it centres its own.
@@ -854,6 +894,17 @@ function InFlight.PrintD(...)  -- debug print
 end
 PrintD = InFlight.PrintD
 
+-------------------------------------
+function InFlight:ExportFlightTimes()  -- for the developers, from /inflight export or the menu
+-------------------------------------
+  -- Not from the PTR, whose flight times have been wrong before.
+  if PTR_IssueReporter == nil then
+    self:ExportDB()
+  else
+    print("Only exporting from the live game client. PTR has been unreliable before.")
+  end
+end
+
 ----------------------------------
 function InFlight:GetDestination()
 ----------------------------------
@@ -870,6 +921,8 @@ end
 -- changed and what it was before. Version 1 is everything up to 12.0.011.
 local replacedDefaults = {
   [1] = {
+    p = "BOTTOM",
+    y = -170,
     countup = true,
     texture = "Blizzard",
     width = 300,
@@ -881,7 +934,7 @@ local replacedDefaults = {
     bordercolor = { r = 0.6, g = 0.6, b = 0.6, a = 0.8, },
     inline = false,
     totext = " >--In Route To--> ",
-    font = "2002 Bold",  -- outside Russian clients replaced, see RepairFont
+    font = "2002 Bold",  -- outside Russian clients replaced, see InFlight:ReplacedFont
     fontsize = 12,
     outline = false,
     outlinetime = false,
@@ -1041,25 +1094,19 @@ function InFlight:LoadBulk()
     local defaultsGlobal = self.defaults.global
 
     for faction, factionNodes in pairs(InFlightDB.global) do
-      -- print("checking InFlightDB.global", faction)
       for src, destNodes in pairs(factionNodes) do
-        -- print("checking InFlightDB.global", faction, src)
         if defaultsGlobal[faction][src] then
           for dst, dtime in pairs(destNodes) do
-            -- print(faction, src, dst, dtime)
             if dst ~= "name" and defaultsGlobal[faction][src][dst] and abs(dtime - defaultsGlobal[faction][src][dst]) < 3 then
-              -- print("deleting", InFlightDB.global[faction][src][dst])
               InFlightDB.global[faction][src][dst] = nil
             end
           end
         end
         if not next(InFlightDB.global[faction][src]) then
-          -- print("deleting", faction, src)
           InFlightDB.global[faction][src] = nil
         end
       end
       if not next(InFlightDB.global[faction]) then
-        -- print("deleting", faction)
         InFlightDB.global[faction] = nil
       end
     end
@@ -1139,17 +1186,11 @@ function InFlight:LoadBulk()
     end
   end
 
-  -- "2002 Bold", the old default font, is left out of the font list on western
-  -- clients, where it draws the same as Friz Quadrata. Korean and Chinese
-  -- clients have no font of that name at all: LibSharedMedia registers it only
-  -- for western and Russian ones, so there it has always drawn as the client's
-  -- default font. Either way a bar set to it gets the client's default instead,
-  -- Friz Quadrata on a western client. It looks no different, and the font
-  -- lists then have it selected. Only on a Russian client is it a font of its
-  -- own, and kept.
+  -- A font the font list no longer offers, "2002 Bold", the old default, among
+  -- them, gives way to the one it looks like. See InFlight:ReplacedFont.
   local function RepairFont(t)
-    if type(t) == "table" and t.font == "2002 Bold" and GetLocale() ~= "ruRU" then
-      t.font = smed:GetDefault("font")
+    if type(t) == "table" and type(t.font) == "string" then
+      t.font = self:ReplacedFont(t.font) or t.font
     end
   end
 
@@ -1365,7 +1406,9 @@ function InFlight:StartTimer(slot)  -- lift off
   end
 
   InFlight:UpdateLook()
-  timeText:SetFormattedText("%s / %s", FormatTime(0), endText)
+  -- The update leaves the text alone until the player is on the taxi, so it has
+  -- to start out right: no time flown with Count Up, the whole length without.
+  ShowTime(0, endTime, endText)
   sb:Show()
   self:Show()
 
@@ -1618,7 +1661,6 @@ do  -- timer bar
           local faction = InFlight.noFactionsZoneNodes[taxiSrc] and "FactionslessZones" or playerFaction
 
           if not defaultsGlobal[faction][taxiSrc] or not defaultsGlobal[faction][taxiSrc]["name"] then
-            -- print("Adding", taxiSrcName, "as new node/new name")
             newPlayerSaveData[faction] = newPlayerSaveData[faction] or {}
             newPlayerSaveData[faction][taxiSrc] = newPlayerSaveData[faction][taxiSrc] or {}
             newPlayerSaveData[faction][taxiSrc]["name"] = taxiSrcName
@@ -1653,7 +1695,6 @@ do  -- timer bar
           local newBaseTime = floor(newTime / speedFactor + 0.5)
 
           if not defaultsGlobal[faction][taxiSrc] or not defaultsGlobal[faction][taxiSrc][taxiDst] or abs(newBaseTime - defaultsGlobal[faction][taxiSrc][taxiDst]) > 2 then
-            -- print("Updating ", newBaseTime, "as new time for", taxiSrcName)
             newPlayerSaveData[faction] = newPlayerSaveData[faction] or {}
             newPlayerSaveData[faction][taxiSrc] = newPlayerSaveData[faction][taxiSrc] or {}
             newPlayerSaveData[faction][taxiSrc][taxiDst] = newBaseTime
@@ -2283,15 +2324,6 @@ function InFlight.ShowSettings()
     return next(InFlight.newPlayerSaveData) ~= nil
   end
 
-  -- Helper: Export flight time data to developers
-  local function ExportFlightTimes()
-    if PTR_IssueReporter == nil then
-      InFlight:ExportDB()
-    else
-      print("Only exporting from the live game client. PTR has been unreliable before.")
-    end
-  end
-
   -- Helper: Give this character's own profile up, keeping its settings for
   -- everyone or throwing them away
   local function DropCharProfile(charKey, keepSettings)
@@ -2690,7 +2722,7 @@ function InFlight.ShowSettings()
     resetTimes:SetTooltip(FlightTimeTooltip(L["ResetFlightTimes"], L["ResetFlightTimesTooltip"]))
 
     local exportTimes = otherMenu:CreateButton(L["ExportFlightTimes"], function()
-      ExportFlightTimes()
+      InFlight:ExportFlightTimes()
     end)
     exportTimes:SetEnabled(HasNewFlightData)
     exportTimes:SetTooltip(FlightTimeTooltip(L["ExportFlightTimes"], L["ExportFlightTimesTooltip"]))
