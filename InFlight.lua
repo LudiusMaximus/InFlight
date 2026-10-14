@@ -1194,10 +1194,22 @@ function InFlight:LoadBulk()
     end
   end
 
+  -- Versions up to 12.0.011 offered a "Textured" border, registered with
+  -- LibSharedMedia at a file that does not exist, so it never drew an edge:
+  -- that is "None". Later versions of LibSharedMedia refuse such a file, and
+  -- some report it as an error, so the border is gone and a bar set to it gets
+  -- "None", which the border lists have selected.
+  local function RepairBorder(t)
+    if type(t) == "table" and t.border == "Textured" then
+      t.border = "None"
+    end
+  end
+
   local function Repair(t)
     RepairMediaKeys(t)
     RepairSpark(t)
     RepairFont(t)
+    RepairBorder(t)
   end
 
   -- The profile in use, whichever table that turns out to be, and then every
