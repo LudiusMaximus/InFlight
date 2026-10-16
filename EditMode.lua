@@ -5,8 +5,9 @@
 -- library keeps our copy in InFlightDB and only reads which layout is active.
 --
 -- A layout's values are overrides on top of the user's own settings, never a
--- replacement for them: everything here goes through InFlight's look table, and
--- db.profile is left alone. See the comment on that table in InFlight.lua.
+-- replacement for them: they only ever reach InFlight's look table. A change to
+-- the user's own settings goes through SetLook, as one from the settings menu
+-- does. See the comment on that table in InFlight.lua.
 
 local LLS = LibStub("LibLayoutSettings-1.0", true)
 
@@ -69,16 +70,29 @@ local layoutKeys
 
 -- Layout specific or not
 --------------------------------------------------------------------------------
--- One state, reachable from two places: this, which the settings menu shows as
--- "Layout Specific Settings", and the InFlight checkbox in the layout editor.
--- While it is on, the active layout owns the bar and everything the settings menu
--- changes goes to that layout. While it is off, the bar wears the user's own
--- settings and the settings menu changes those.
+-- One state, reachable from three places, all called "Layout Specific Settings":
+-- the settings menu, the settings page, and the bar's dialog in the layout
+-- editor. While it is on, the active layout owns the bar and every change goes to
+-- that layout. While it is off, the bar wears the user's own settings and every
+-- change goes to those. In the layout editor, turning it on or off is a change
+-- that waits for Save, as everything else there does. The InFlight checkbox in
+-- the layout editor's AddOns panel is something else: it only shows or hides the
+-- bar there, the way Blizzard's own checkboxes on that panel do.
 
 ------------------------------------
 function InFlight:IsLayoutSpecific()
 ------------------------------------
   return LLS ~= nil and LLS:IsManaged("InFlightBar")
+end
+
+
+-------------------------------------
+function InFlight:IsInLayoutEditor()
+-------------------------------------
+  -- While the layout editor is open, every change waits for its Save, whether it
+  -- is for the layout or for the user's own settings. False while the library
+  -- hands the user's own settings over on Save, so that they land in the profile.
+  return LLS ~= nil and LLS:IsEditing()
 end
 
 
@@ -109,13 +123,14 @@ function InFlight:IsOnPresetLayout()
 end
 
 
------------------------------------------
-function InFlight:ResetLayoutToDefaults()
------------------------------------------
-  -- Puts this layout's own settings back to the defaults in Defaults.lua, all but
-  -- its position. The user's own settings are not touched: this layout is what
-  -- the settings menu is editing while it is layout specific, so this layout is
-  -- what resets.
+-----------------------------------
+function InFlight:ResetAppearance()
+-----------------------------------
+  -- Puts the bar's look back to the defaults in Defaults.lua: every setting the
+  -- layout editor shows, but not the position, which Reset To Default Position
+  -- sees to, nor anything else in the user's settings. Through SetLook, so it goes
+  -- wherever a change goes right now: the layout while it owns the bar, the
+  -- layout editor's Save while that is open, the user's own settings otherwise.
   if not layoutKeys then
     return
   end
@@ -124,7 +139,7 @@ function InFlight:ResetLayoutToDefaults()
   for _, key in ipairs(layoutKeys) do
     local value = defaults[key]
     if value ~= nil and not self.positionKeys[key] then
-      self:SetLookOverride(key, type(value) == "table" and CopyTable(value) or value)
+      self:SetLook(key, type(value) == "table" and CopyTable(value) or value)
     end
   end
 
@@ -133,10 +148,10 @@ function InFlight:ResetLayoutToDefaults()
 end
 
 
---------------------------------------
-function InFlight:LayoutIsAtDefaults()
---------------------------------------
-  -- Whether resetting this layout would change nothing.
+-------------------------------------------
+function InFlight:AppearanceIsAtDefaults()
+-------------------------------------------
+  -- Whether Reset Appearance would change nothing.
   for _, key in ipairs(layoutKeys or {}) do
     if not self.positionKeys[key] and not self:IsDefaultValue(key, self:GetLook(key)) then
       return false
@@ -212,6 +227,20 @@ function InFlight:SetupEditMode()
   InFlightDB.editModeLayouts = InFlightDB.editModeLayouts or {}
 
   local settings = {
+    -- First, because it decides what everything below changes. The library ticks
+    -- it, keeps it and greys it out where no layout can be given the bar. Read at
+    -- hover time, so that it names the layout that is active then.
+    { type = "layoutSpecific", name = L["LayoutSpecific"],
+      tooltip = function()
+        local text = format(L["LayoutSpecificRowTooltip"], InFlight:GetLayoutName() or "")
+        if InFlight:IsOnPresetLayout() and not InFlight:CanBeLayoutSpecific() then
+          text = text .. "\n\n" .. format(L["LayoutSpecificPreset"], InFlight:GetLayoutName() or "")
+        end
+        return text
+      end },
+
+    { type = "separator" },
+
     -- The handful you normally reach for when setting a layout up.
     { key = "height",   name = L["Height"],   type = "slider", minValue = 4,  maxValue = 150,  stepSize = 1 },
     { key = "width",    name = L["Width"],    type = "slider", minValue = 40, maxValue = 1000, stepSize = 5 },
@@ -283,15 +312,16 @@ function InFlight:SetupEditMode()
     -- GetDefaultPosition names, and does the resetting.
     { type = "resetPosition", tooltip = L["ResetPositionTooltip"] },
 
-    -- The same reset the settings menu offers, which while a layout owns the bar
-    -- is this layout's reset. Everything but the position, which the button
-    -- beside it resets, and greyed out like that one while there is nothing to
-    -- reset.
-    { type = "button", text = L["ResetToDefaults"], tooltip = L["ResetToDefaultsTooltip"],
+    -- The look, where the button beside it is the position, so that between them
+    -- they say which is which. Only what this list shows, unlike the settings
+    -- menu's Reset to Defaults, which while no layout owns the bar resets the
+    -- user's other settings too. Greyed out like the position's while there is
+    -- nothing to reset.
+    { type = "button", text = L["ResetAppearance"], tooltip = L["ResetAppearanceTooltip"],
       sameRow = true,
-      IsDisabled = function() return InFlight:IsAtDefaults() end,
+      IsDisabled = function() return InFlight:AppearanceIsAtDefaults() end,
       OnClick = function()
-        InFlight:ResetToDefaults()
+        InFlight:ResetAppearance()
       end },
 
     { type = "separator" },
@@ -340,7 +370,7 @@ function InFlight:SetupEditMode()
   }
 
   -- Two jobs in one pass over the list just built. The keys a layout may hold
-  -- come from the list itself, so it and ResetLayoutToDefaults cannot drift
+  -- come from the list itself, so it and ResetAppearance cannot drift
   -- apart, and every row takes its tooltip from the same table the settings menu
   -- reads, so a setting cannot end up described one way here and another there.
   layoutKeys = { "p", "rp", "x", "y" }
@@ -357,6 +387,10 @@ function InFlight:SetupEditMode()
     -- Plain, so that it reads like the entries of the edit mode's own panel.
     displayName = "InFlight",
     storage = InFlightDB.editModeLayouts,
+    -- Whether the bar shows in the layout editor, which the InFlight checkbox in
+    -- its AddOns panel decides. Account wide, like Blizzard's own checkboxes there.
+    IsShownInEditMode = function() return not InFlightDB.editModeHidden end,
+    SetShownInEditMode = function(shown) InFlightDB.editModeHidden = not shown or nil end,
     selectionInsets = { left = 8, right = 8, top = 8, bottom = 8 },
     -- The bar shows the route and the time, which the centred name would cover.
     showSelectionLabel = false,
@@ -383,7 +417,8 @@ function InFlight:SetupEditMode()
 
     -- A change on the settings page, which goes where one from the settings menu
     -- goes: to the layout while it owns the bar, to the user's own settings
-    -- otherwise.
+    -- otherwise. Also how the layout editor saves the changes it made to the
+    -- user's own settings.
     EditSetting = function(key, value)
       InFlight:SetLook(key, value)
     end,
@@ -447,7 +482,8 @@ function InFlight:CaptureEditModeLayout()
   -- A change made in the settings menu is meant to stick, so a layout that owns
   -- the bar has to take it on board. Without this it would put its own value back
   -- the next time it is applied. Layouts that do not own the bar are left alone,
-  -- so nothing changes for anyone who never ticked the box.
+  -- so nothing changes for anyone who never ticked the box. While the layout
+  -- editor is open, this is also what holds a change back for its Save.
   if LLS then
     LLS:Capture("InFlightBar")
   end

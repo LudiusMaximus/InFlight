@@ -2081,11 +2081,12 @@ function InFlight:ResetToDefaults()
 -----------------------------------
   -- Resets whatever the settings are editing right now: the active layout's own
   -- settings, or the user's own, which are account wide or character specific
-  -- depending on the other checkbox. Shared by the settings menu, the settings
-  -- page and the layout editor, which all edit the same thing. The position is
-  -- kept.
-  if self:IsLayoutSpecific() then
-    self:ResetLayoutToDefaults()
+  -- depending on the other checkbox. The settings menu's, which covers every
+  -- setting but the position. A layout only holds the bar's look, so for a
+  -- layout, and in the layout editor where a change waits for Save, this is
+  -- Reset Appearance, which the settings page and the layout editor offer.
+  if self:IsLayoutSpecific() or self:IsInLayoutEditor() then
+    self:ResetAppearance()
     return
   end
 
@@ -2108,8 +2109,8 @@ end
 --------------------------------
 function InFlight:IsAtDefaults()
 --------------------------------
-  if self:IsLayoutSpecific() then
-    return self:LayoutIsAtDefaults()
+  if self:IsLayoutSpecific() or self:IsInLayoutEditor() then
+    return self:AppearanceIsAtDefaults()
   end
   for key in pairs(self.defaults.profile) do
     if not self.positionKeys[key] and key ~= "perchar" and not self:IsDefaultValue(key, self.db.profile[key]) then
@@ -2179,12 +2180,15 @@ end
 
 
 -------------------------------------
-function InFlight:SetLook(key, value)  -- a setting changed outside the layout editor
+function InFlight:SetLook(key, value)  -- a setting changed from the menu, the page or a button
 -------------------------------------
   -- Where the change lands is what the "Layout Specific Settings" checkbox
   -- decides: the layout that owns the bar, or the user's own settings. A change
-  -- never goes to both, so nothing is rewritten behind the user's back.
-  if self:IsLayoutSpecific() then
+  -- never goes to both, so nothing is rewritten behind the user's back. While the
+  -- layout editor is open, nothing is kept until Save, whichever of the two it is
+  -- for, so the change goes on the bar the way a layout's does, and the
+  -- CaptureEditModeLayout that follows every change holds it back for Save.
+  if self:IsLayoutSpecific() or self:IsInLayoutEditor() then
     look[key] = type(value) == "table" and CopyTable(value) or value
   else
     profile[key] = value
@@ -2581,11 +2585,12 @@ function InFlight.ShowSettings()
     -- First, because between them these two say what everything below applies
     -- to: this layout, this character, or every character.
 
-    -- The same state as the InFlight box in the layout editor. Absent where there
-    -- is no layout to give the bar to, an override layout for instance. Greyed
-    -- out on a preset layout, which the layout editor only lets you change by
-    -- saving it as a new layout, so that it cannot end up in a state the layout
-    -- editor itself could never reach.
+    -- The same state as the box of the same name on the settings page and in the
+    -- bar's dialog in the layout editor. Absent where there is no layout to give
+    -- the bar to, an override layout for instance. Greyed out on a preset layout,
+    -- which the layout editor only lets you change by saving it as a new layout,
+    -- so that it cannot end up in a state the layout editor itself could never
+    -- reach.
     if InFlight:CanBeLayoutSpecific() or InFlight:IsOnPresetLayout() then
       local layoutSpecific = mainMenu:CreateCheckbox(L["LayoutSpecific"],
         function() return InFlight:IsLayoutSpecific() end,

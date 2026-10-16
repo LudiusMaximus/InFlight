@@ -17,6 +17,7 @@ L["PreviewInFlight"] = "바가 이미 현재 비행을 표시하고 있습니다
 -- Settings menu: what a change applies to
 L["LayoutSpecific"] = "구성별 설정"
 L["LayoutSpecificTooltip"] = "현재 편집 모드 구성(%1$s)에 InFlight 전용 설정을 부여합니다. 이후 이 메뉴의 모든 항목은 해당 구성만 변경하며, 내 설정은 그대로 유지됩니다. 끄면 바가 다시 내 설정을 사용하고, 구성의 설정은 나중을 위해 보관됩니다."
+L["LayoutSpecificRowTooltip"] = "현재 편집 모드 구성(%1$s)에 InFlight 전용 설정을 부여합니다. 이후 바에서 변경하는 모든 내용은 해당 구성만 변경하며, 내 설정은 그대로 유지됩니다. 끄면 바가 다시 내 설정을 사용하고, 구성의 설정은 나중을 위해 보관됩니다."
 L["LayoutSpecificPreset"] = "%1$s 구성은 사전 설정 구성이며, 사전 설정 구성은 변경할 수 없습니다. InFlight에 구성별 설정을 부여하려면 편집 모드를 열고 이 구성의 사본을 내 구성으로 저장하세요."
 L["PerCharOptions"] = "캐릭터별 설정"
 L["PerCharOptionsTooltip"] = "이 캐릭터만의 InFlight 설정을 따로 유지합니다. 끄면 바가 모든 캐릭터가 함께 쓰는 계정 공유 설정을 사용합니다."
@@ -82,6 +83,8 @@ L["ConfirmFlightTooltip"] = "비행하기 전에 목적지와 예상 소요 시�
 L["ConfirmPopup"] = "%s로 비행할까요?"
 L["ResetToDefaults"] = "기본값 복원"
 L["ResetToDefaultsTooltip"] = "바의 위치를 제외한 모든 설정을 애드온의 기본 상태로 되돌립니다. 지금 편집 중인 대상에 적용됩니다: 구성의 설정, 이 캐릭터의 설정 또는 계정 공유 설정."
+L["ResetAppearance"] = "외형 복원"
+L["ResetAppearanceTooltip"] = "바의 위치를 제외한 이곳의 모든 외형 설정을 애드온의 기본 상태로 되돌립니다. 지금 편집 중인 대상에 적용됩니다: 구성의 설정, 이 캐릭터의 설정 또는 계정 공유 설정."
 L["ResetFlightTimes"] = "비행 시간 초기화"
 L["ResetFlightTimesTooltip"] = "InFlight가 기록한 모든 비행 시간을 지우고 UI를 다시 불러옵니다. 애드온에 포함된 비행 시간은 다시 사용됩니다."
 L["ExportFlightTimes"] = "비행 시간 내보내기"
