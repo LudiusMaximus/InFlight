@@ -630,7 +630,7 @@ local function GetEstimatedTime(slot)  -- estimates flight times based on hops
       local dstNodes = GetDstNodes(taxiNodes[srcNode], playerFaction)
       if dstNodes then
         if not etimes[dstNode] and dstNodes[taxiNodes[dstNode]] then
-          etimes[dstNode] = etimes[srcNode] + dstNodes[taxiNodes[dstNode]] * InFlight:KhazAlgarFlightMasterFactor(taxiNodes[dstNode]) * InFlight:RideLikeTheWindFactor()
+          etimes[dstNode] = etimes[srcNode] + dstNodes[taxiNodes[dstNode]] * InFlight:SpeedFactor(taxiNodes[dstNode])
           PrintD(taxiNodes[dstNode].."("..dstNode..") time:", FormatTime(etimes[srcNode]), "+", FormatTime(dstNodes[taxiNodes[dstNode]]), "=", FormatTime(etimes[dstNode]))
           nextNode[srcNode] = dstNode - 1
           prevNode[dstNode] = srcNode
@@ -677,7 +677,7 @@ local function postTaxiNodeOnButtonEnter(button) -- adds duration info to taxi n
   local dstNodes = GetDstNodes(taxiSrc, playerFaction)
   local duration = dstNodes and dstNodes[tmpTaxiDst]
   if duration then
-    addDuration(duration * InFlight:KhazAlgarFlightMasterFactor(tmpTaxiDst) * InFlight:RideLikeTheWindFactor())
+    addDuration(duration * InFlight:SpeedFactor(tmpTaxiDst))
   else
     addDuration(GetEstimatedTime(id) or 0, true)
   end
@@ -693,7 +693,7 @@ local function postFlightNodeOnButtonEnter(button) -- adds duration info to flig
   local tmpTaxiDst = button.taxiNodeData.nodeID
   local duration = dstNodes and dstNodes[tmpTaxiDst]
   if duration then
-    addDuration(duration * InFlight:KhazAlgarFlightMasterFactor(tmpTaxiDst) * InFlight:RideLikeTheWindFactor())
+    addDuration(duration * InFlight:SpeedFactor(tmpTaxiDst))
   else
     addDuration(GetEstimatedTime(button.taxiNodeData.slotIndex) or 0, true)
   end
@@ -894,11 +894,17 @@ function InFlight.PrintD(...)  -- debug print
 end
 PrintD = InFlight.PrintD
 
+-- Not exporting flight times from PTR or beta clients. They have been wrong before,
+-- and would replace the correct times of the live game. Except for WoW Forever
+-- (WOW_PROJECT_CAMELOT, only defined there), whose times are not known yet at all.
+local function CanExport()
+  return PTR_IssueReporter == nil or WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
+end
+
 -------------------------------------
 function InFlight:ExportFlightTimes()  -- for the developers, from /inflight export or the menu
 -------------------------------------
-  -- Not from the PTR, whose flight times have been wrong before.
-  if PTR_IssueReporter == nil then
+  if CanExport() then
     self:ExportDB()
   else
     print("Only exporting from the live game client. PTR has been unreliable before.")
@@ -1134,8 +1140,7 @@ function InFlight:LoadBulk()
       end
     end
 
-    -- Not exporting flight times from PTR. They have been wrong before.
-    if PTR_IssueReporter == nil and found > 0 and (not InFlightDB.upload or InFlightDB.upload < time()) then
+    if CanExport() and found > 0 and (not InFlightDB.upload or InFlightDB.upload < time()) then
       Print(format("|cff208020- " .. L["FlightTimeContribute"] .. "|r", "|r" .. found .. "|cff208020"))
       InFlightDB.upload = time() + 604800  -- 1 week in seconds (60 * 60 * 24 * 7)
     end
@@ -1269,7 +1274,7 @@ function InFlight:LoadBulk()
 
     local dstNodes = GetDstNodes(taxiSrc, playerFaction)
     if dstNodes and dstNodes[taxiDst] and dstNodes[taxiDst] > 0 then  -- saved variables lookup
-      endTime = dstNodes[taxiDst] * InFlight:KhazAlgarFlightMasterFactor(taxiDst) * InFlight:RideLikeTheWindFactor()
+      endTime = dstNodes[taxiDst] * InFlight:SpeedFactor(taxiDst)
       endText = FormatTime(endTime)
     else
       endTime = GetEstimatedTime(slot)
@@ -1559,7 +1564,7 @@ function InFlight:StartMiscFlight(src, dst)  -- called for flights started by a 
   local dstNodes = GetDstNodes(taxiSrc, playerFaction)
   endTime = dstNodes and dstNodes[dst]
   if endTime then
-     endTime = endTime * self:KhazAlgarFlightMasterFactor(taxiSrc) * self:RideLikeTheWindFactor()
+     endTime = endTime * self:SpeedFactor(taxiDst)
   end
   endText = FormatTime(endTime)
   self:StartTimer()
@@ -1681,7 +1686,7 @@ do  -- timer bar
 
 
           -- Stored times are always without speed boosts, while measured times include them.
-          local speedFactor = InFlight:KhazAlgarFlightMasterFactor(taxiDst) * InFlight:RideLikeTheWindFactor()
+          local speedFactor = InFlight:SpeedFactor(taxiDst)
 
           InFlight.db.global[faction][taxiSrc] = InFlight.db.global[faction][taxiSrc] or { name = taxiSrcName }
           local oldTime = InFlight.db.global[faction][taxiSrc][taxiDst]
@@ -2382,7 +2387,8 @@ function InFlight.ShowSettings()
 
   -- Helper: Toggle per-character profile setting. Returns the menu's response.
   local function TogglePerCharProfile()
-    local charKey = UnitName("player") .. " - " .. GetRealmName()
+    -- AceDB's own key, which on WoW Forever is first name and surname without a realm.
+    local charKey = InFlight.db.keys.char
     if profile.perchar then
       -- Disabling: the character's own settings are about to go, so ask what
       -- should become of them first, unless there is nothing to lose.

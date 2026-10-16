@@ -366,6 +366,39 @@ function InFlight:RideLikeTheWindFactor()
 end
 
 
+-- ######################################################################################
+-- ########## Return factor to handle WoW Forever "Frequent Flier" speed boost. #########
+-- ######################################################################################
+
+function InFlight:FrequentFlierFactor()
+  -- Legacy perks only exist in WoW Forever.
+  local legacy = Constants.LegacyConsts
+  if not legacy or not legacy.LEGACY_TREE_ADVENTURE_ID then return 1 end
+
+  -- Frequent Flier is node 110300 of the Adventure Legacy tree (spell 1225490), making
+  -- flight path mounts 20% faster. Legacy perks are bought per character, so this is
+  -- checked for every flight. Blizzard reads the tree the same way for its micro menu.
+  local configID = C_Traits.GetConfigIDByTreeID(legacy.LEGACY_TREE_ADVENTURE_ID)
+  local node = configID and C_Traits.GetNodeInfo(configID, 110300)
+  if node and node.activeRank > 0 then
+    return 1 / 1.2
+  end
+
+  return 1
+end
+
+
+-- ##################################################################################
+-- ########## Return the factor of all speed boosts for a flight to nodeID. #########
+-- ##################################################################################
+
+-- Stored flight times are always without speed boosts, so multiply them by this
+-- to get the time of the flight, and divide measured times by it before storing.
+function InFlight:SpeedFactor(nodeID)
+  return self:KhazAlgarFlightMasterFactor(nodeID) * self:RideLikeTheWindFactor() * self:FrequentFlierFactor()
+end
+
+
 
 
 

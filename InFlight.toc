@@ -1,4 +1,4 @@
-﻿## Interface: 120105, 50504, 20506, 11509
+﻿## Interface: 120105, 16001, 50504, 20506, 11509
 ## Version: @project-version@
 ## Title: InFlight
 ## IconAtlas: Taxi_Frame_Yellow

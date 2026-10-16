@@ -2,12 +2,12 @@
 
 InFlight shows a timer bar while you fly with a flight master, so you know where you are headed and how long it will take. On the flight map, it also tells you how long each flight takes before you pick one.
 
-InFlight works on Retail, Mists of Pandaria Classic, TBC Classic Anniversary and Classic Era.
+InFlight works on Retail, WoW Forever, Mists of Pandaria Classic, TBC Classic Anniversary and Classic Era.
 
 ## Features
 
 ### Timer Bar
-When you take off, a bar shows your destination and the time left, or the time flown if you prefer to count up. If InFlight does not know a route yet, it estimates the time from the parts of the route it does know, or simply counts up, and remembers the time once you land. If a flight takes longer or shorter than InFlight expected, it corrects the time. Speed bonuses like the Khaz Algar Flight Master achievement or Ride Like the Wind in Mists of Pandaria Classic are taken into account.
+When you take off, a bar shows your destination and the time left, or the time flown if you prefer to count up. If InFlight does not know a route yet, it estimates the time from the parts of the route it does know, or simply counts up, and remembers the time once you land. If a flight takes longer or shorter than InFlight expected, it corrects the time. Speed bonuses like the Khaz Algar Flight Master achievement, Ride Like the Wind in Mists of Pandaria Classic or the Frequent Flier perk in WoW Forever are taken into account.
 
 The timer keeps running through a UI reload. Flights you start by talking to an NPC, like the Druid flights from Moonglade or the one from the Caverns of Time to Nozdormu's Lair, get a timer too, in every client language.
 
