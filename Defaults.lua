@@ -22770,10 +22770,24 @@ local global_wrath = {
 
 
 
+-- WoW Forever, a 1.60 game with flight masters of its own besides those of
+-- Classic Era. Only what differs from Classic Era goes here.
+-- No WoW Forever exports yet.
+local global_forever = {
+  ["Horde"] = {
+  },
+  ["Alliance"] = {
+  },
+}
+
+
+
+
 -- Make these available for export.
 addon.global_classic = global_classic
 addon.global_tbc = global_tbc
 addon.global_wrath = global_wrath
+addon.global_forever = global_forever
 
 
 -- Apply an era table on top of the post-Cataclysm defaults.
@@ -22794,13 +22808,27 @@ local function ApplyEraTable(eraNodes)
 end
 
 
+-- WoW Forever (WOW_PROJECT_CAMELOT, only defined there) starts from the Classic
+-- Era times alone. The post-Cataclysm times are of flight paths Cataclysm redrew,
+-- so they would be wrong there, and a flight path Classic Era does not know is
+-- better left unknown and timed on its first flight.
+if WOW_PROJECT_ID == WOW_PROJECT_CAMELOT then
+  InFlight.defaults.global = {
+    ["Horde"] = {},
+    ["Alliance"] = {},
+  }
+  ApplyEraTable(global_classic)
+  ApplyEraTable(global_forever)
+
 -- Oldest era first, so that the closest matching era wins for each flight path.
-ApplyEraTable(global_classic)
-if buildInterface >= 20000 then
-  ApplyEraTable(global_tbc)
-end
-if buildInterface >= 30000 then
-  ApplyEraTable(global_wrath)
+else
+  ApplyEraTable(global_classic)
+  if buildInterface >= 20000 then
+    ApplyEraTable(global_tbc)
+  end
+  if buildInterface >= 30000 then
+    ApplyEraTable(global_wrath)
+  end
 end
 
 end  -- pre-cata

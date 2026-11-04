@@ -1043,6 +1043,8 @@ function InFlight:LoadBulk()
   -- Ratchet to Orgrimmar takes 210 seconds on Classic Era, where the trip goes via
   -- The Crossroads, and 101 seconds on TBC Classic, where it is direct.
   -- Everlook to Marshal's Stand takes 641 seconds on TBC Classic and 815 on retail.
+  -- WoW Forever counts as an era of its own, with flight masters Classic Era does
+  -- not have.
   --
   -- Raise the dbinit of an era to wipe the databases of that era once. All four
   -- had to be raised here, because times measured before the speed boost fix were
@@ -1050,7 +1052,9 @@ function InFlight:LoadBulk()
   -- been split up by era.
   local buildInterface = select(4, GetBuildInfo())
   local dbVersion, dbinitVersion
-  if buildInterface >= 40000 then
+  if WOW_PROJECT_ID == WOW_PROJECT_CAMELOT then
+    dbVersion, dbinitVersion = "forever", 1200010
+  elseif buildInterface >= 40000 then
     dbVersion, dbinitVersion = "post-cata", 1200010
   elseif buildInterface >= 30000 then
     dbVersion, dbinitVersion = "wrath", 1200010

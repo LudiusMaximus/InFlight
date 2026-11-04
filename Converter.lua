@@ -318,9 +318,13 @@ local function CreateNoFactionZoneNodes()
 
 end
 
-local reloadFrame = CreateFrame("Frame")
-reloadFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-reloadFrame:SetScript("OnEvent", CreateNoFactionZoneNodes)
+-- Only retail has these zones. Everywhere else, WoW Forever included, no node is
+-- factionless and none gets the Khaz Algar boost, whatever its ID.
+if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+  local reloadFrame = CreateFrame("Frame")
+  reloadFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+  reloadFrame:SetScript("OnEvent", CreateNoFactionZoneNodes)
+end
 
 
 
@@ -727,7 +731,12 @@ end
 -- -- pre-cata: every era has its own table, because the eras do not share
 -- -- flight times. Import into the table of the era the export came from.
 -- local buildInterface = select(4, GetBuildInfo())
--- if buildInterface < 20000 then
+-- if WOW_PROJECT_ID == WOW_PROJECT_CAMELOT then
+
+  -- ImportUserUpload(addon.global_forever, myImport, false)
+  -- exportText = GetExportText("local global_forever", addon.global_forever, "")
+
+-- elseif buildInterface < 20000 then
 
   -- ImportUserUpload(addon.global_classic, myImport, false)
   -- exportText = GetExportText("local global_classic", addon.global_classic, "")
